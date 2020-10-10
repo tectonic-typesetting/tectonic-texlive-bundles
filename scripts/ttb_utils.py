@@ -151,6 +151,7 @@ class Bundle(object):
 
 
 IGNORED_BASE_NAMES = set([
+    '00readme.txt',
     'LICENSE.md',
     'Makefile',
     'README',
