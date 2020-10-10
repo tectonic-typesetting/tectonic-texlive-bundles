@@ -139,6 +139,14 @@ class ZipMaker(object):
                 if len(line):
                     self.ignored_tex_paths.add(line)
 
+        self.ignored_tex_path_prefixes = []
+
+        with open(bundle.path('ignored-tex-path-prefixes.txt')) as f:
+            for line in f:
+                line = line.split('#')[0].strip()
+                if len(line):
+                    self.ignored_tex_path_prefixes.append(line)
+
 
     def add_file(self, full_path):
         base = os.path.basename(full_path)
@@ -189,6 +197,10 @@ class ZipMaker(object):
 
         if tex_path in self.ignored_tex_paths:
             return
+
+        for pfx in self.ignored_tex_path_prefixes:
+            if tex_path.startswith(pfx):
+                return
 
         self.add_file(full_path)
 
