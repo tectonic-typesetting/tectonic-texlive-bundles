@@ -22,7 +22,7 @@ impl error::Error for TarError {
         &self.desc
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         Some(&self.io)
     }
 }

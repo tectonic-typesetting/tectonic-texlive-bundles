@@ -1,31 +1,23 @@
 // src/main.rs -- the zip2tarindex conversion helper program
-// Copyright 2017 The Tectonic Project
+// Copyright 2017-2020 The Tectonic Project
 // Licensed under the MIT License.
 
-extern crate clap;
-extern crate flate2;
-extern crate zip;
-
-use clap::{Arg, App};
-use std::{fmt, path, process};
+use clap::{App, Arg};
 use std::fs::File;
-use std::io::{stderr, Cursor, Error, ErrorKind, Read,  Write};
+use std::io::{stderr, Cursor, Error, ErrorKind, Read, Write};
 use std::os::unix::ffi::OsStringExt;
+use std::{fmt, path, process};
 use zip::ZipArchive;
 
 // Here is stuff from tar-rs's lib.rs:
 
-extern crate libc;
-//#[cfg(all(unix, feature = "xattr"))]
-//extern crate xattr;
-
-pub use header::{Header, OldHeader, UstarHeader, GnuHeader, GnuSparseHeader};
-pub use header::{GnuExtSparseHeader};
 pub use entry_type::EntryType;
+pub use header::GnuExtSparseHeader;
+pub use header::{GnuHeader, GnuSparseHeader, Header, OldHeader, UstarHeader};
 //pub use entry::Entry;
 //pub use archive::{Archive, Entries};
 pub use builder::HackedBuilder;
-pub use pax::{PaxExtensions, PaxExtension};
+pub use pax::{PaxExtension, PaxExtensions};
 
 //mod archive;
 mod builder;
@@ -46,19 +38,22 @@ fn die(args: fmt::Arguments) -> ! {
     process::exit(1)
 }
 
-
 fn main() {
     let matches = App::new("zip2tarindex")
         .version("0.1")
         .about("Convert a Zip file to a tar file with an index.")
-        .arg(Arg::with_name("ZIPFILE")
-             .help("The input Zip file to process.")
-             .required(true)
-             .index(1))
-        .arg(Arg::with_name("TARPATH")
-             .help("The name of the output tar file to create.")
-             .required(true)
-             .index(2))
+        .arg(
+            Arg::with_name("ZIPFILE")
+                .help("The input Zip file to process.")
+                .required(true)
+                .index(1),
+        )
+        .arg(
+            Arg::with_name("TARPATH")
+                .help("The name of the output tar file to create.")
+                .required(true)
+                .index(2),
+        )
         .get_matches();
 
     let zippath = matches.value_of("ZIPFILE").unwrap();
@@ -82,14 +77,21 @@ fn main() {
     indexpath.set_file_name(&tar_fn);
     let indexfile = match File::create(&indexpath) {
         Ok(f) => f,
-        Err(e) => die(format_args!("failed to create \"{}\": {}", indexpath.display(), e)),
+        Err(e) => die(format_args!(
+            "failed to create \"{}\": {}",
+            indexpath.display(),
+            e
+        )),
     };
 
     // Stack up our I/O processing chain.
 
     let mut zip = match ZipArchive::new(zipfile) {
         Ok(a) => a,
-        Err(e) => die(format_args!("couldn\'t open {} as a Zip file: {}", zippath, e))
+        Err(e) => die(format_args!(
+            "couldn\'t open {} as a Zip file: {}",
+            zippath, e
+        )),
     };
 
     if zip.len() == 0xFFFF {
@@ -98,7 +100,9 @@ fn main() {
         // the behavior you get is what's tested for here -- which then can
         // cause silent failures, with the resulting tar file not containing
         // all of the files it should.
-        die(format_args!("this Zip file requires a ZIP64-capable parser, which we don't have"));
+        die(format_args!(
+            "this Zip file requires a ZIP64-capable parser, which we don't have"
+        ));
     }
 
     let mut gzindex = flate2::GzBuilder::new()
@@ -117,18 +121,30 @@ fn main() {
 
         let mut buf = Vec::with_capacity(size as usize);
         if let Err(e) = file.read_to_end(&mut buf) {
-            die(format_args!("failure reading \"{}\" from Zip: {}", file.name(), e));
+            die(format_args!(
+                "failure reading \"{}\" from Zip: {}",
+                file.name(),
+                e
+            ));
         }
 
         if let Err(e) = header.set_path(file.name()) {
-            die(format_args!("failure encoding filename \"{}\": {}", file.name(), e));
+            die(format_args!(
+                "failure encoding filename \"{}\": {}",
+                file.name(),
+                e
+            ));
         }
 
         header.set_size(size);
         header.set_cksum();
 
         if let Err(e) = tar.append(&header, Cursor::new(buf)) {
-            die(format_args!("failure appending \"{}\" to tar: {}", file.name(), e));
+            die(format_args!(
+                "failure appending \"{}\" to tar: {}",
+                file.name(),
+                e
+            ));
         }
     }
 

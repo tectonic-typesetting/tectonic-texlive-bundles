@@ -1,7 +1,7 @@
-use std::io::{self, SeekFrom};
 use std::io::prelude::*;
+use std::io::{self, SeekFrom};
 
-use Header;
+use crate::Header;
 
 /// A structure for building archives
 ///
@@ -35,11 +35,10 @@ impl<WO: Write + Seek, WI: Write> HackedBuilder<WO, WI> {
     /// that operation.
     pub fn into_inner(mut self) -> io::Result<WO> {
         if !self.finished {
-            try!(self.finish());
+            self.finish()?;
         }
         Ok(self.obj.take().unwrap())
     }
-   
     /// Adds a new entry to this archive.
     ///
     /// This function will append the header specified, followed by contents of
@@ -76,28 +75,32 @@ impl<WO: Write + Seek, WI: Write> HackedBuilder<WO, WI> {
     /// ar.append(&header, data).unwrap();
     /// let data = ar.into_inner().unwrap();
     /// ```
-    pub fn append<R: Read>(&mut self, header: &Header, mut data: R)
-                           -> io::Result<()> {
+    pub fn append<R: Read>(&mut self, header: &Header, mut data: R) -> io::Result<()> {
         // tar-rs implements this method by handing off to a standalone
         // function, but its style doesn't work for us since we can't get away
         // with just trait objects. (It's not clear to me why tar-rs does
         // things the way it does.) We just copy the implementation here.
         let mut dst = self.obj.as_mut().unwrap();
 
-        try!(dst.write_all(header.as_bytes()));
+        dst.write_all(header.as_bytes())?;
         let pos = dst.seek(SeekFrom::Current(0)).unwrap();
 
-        let len = try!(io::copy(&mut data, &mut dst));
+        let len = io::copy(&mut data, &mut dst)?;
 
         // THE HACK: write out an index line.
-        writeln!(self.index, "{} {} {}", header.path().unwrap().display(),
-                 pos, len).expect("index write failed");
-        
+        writeln!(
+            self.index,
+            "{} {} {}",
+            header.path().unwrap().display(),
+            pos,
+            len
+        )
+        .expect("index write failed");
         // Pad with zeros if necessary.
         let buf = [0; 512];
         let remaining = 512 - (len % 512);
         if remaining < 512 {
-            try!(dst.write_all(&buf[..remaining as usize]));
+            dst.write_all(&buf[..remaining as usize])?;
         }
 
         Ok(())
@@ -112,7 +115,7 @@ impl<WO: Write + Seek, WI: Write> HackedBuilder<WO, WI> {
     /// In most situations the `into_inner` method should be preferred.
     pub fn finish(&mut self) -> io::Result<()> {
         if self.finished {
-            return Ok(())
+            return Ok(());
         }
         self.finished = true;
         self.inner().write_all(&[0; 1024])

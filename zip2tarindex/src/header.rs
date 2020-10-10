@@ -1,5 +1,7 @@
-#[cfg(unix)] use std::os::unix::prelude::*;
-#[cfg(windows)] use std::os::windows::prelude::*;
+#[cfg(unix)]
+use std::os::unix::prelude::*;
+#[cfg(windows)]
+use std::os::windows::prelude::*;
 
 use std::borrow::Cow;
 use std::fmt;
@@ -7,11 +9,10 @@ use std::fs;
 use std::io;
 use std::iter::repeat;
 use std::mem;
-use std::path::{Path, PathBuf, Component};
+use std::path::{Component, Path, PathBuf};
 use std::str;
 
-use EntryType;
-use other;
+use crate::{other, EntryType};
 
 /// Representation of the header of an entry in an archive
 #[repr(C)]
@@ -201,12 +202,20 @@ impl Header {
     /// magic/version fields of the UStar format have the appropriate values,
     /// returning `None` if they aren't correct.
     pub fn as_ustar(&self) -> Option<&UstarHeader> {
-        if self.is_ustar() {Some(self.cast())} else {None}
+        if self.is_ustar() {
+            Some(self.cast())
+        } else {
+            None
+        }
     }
 
     /// Same as `as_ustar_mut`, but the mutable version.
     pub fn as_ustar_mut(&mut self) -> Option<&mut UstarHeader> {
-        if self.is_ustar() {Some(self.cast_mut())} else {None}
+        if self.is_ustar() {
+            Some(self.cast_mut())
+        } else {
+            None
+        }
     }
 
     /// View this archive header as a raw GNU archive header.
@@ -219,12 +228,20 @@ impl Header {
     /// magic/version fields of the GNU format have the appropriate values,
     /// returning `None` if they aren't correct.
     pub fn as_gnu(&self) -> Option<&GnuHeader> {
-        if self.is_gnu() {Some(self.cast())} else {None}
+        if self.is_gnu() {
+            Some(self.cast())
+        } else {
+            None
+        }
     }
 
     /// Same as `as_gnu`, but the mutable version.
     pub fn as_gnu_mut(&mut self) -> Option<&mut GnuHeader> {
-        if self.is_gnu() {Some(self.cast_mut())} else {None}
+        if self.is_gnu() {
+            Some(self.cast_mut())
+        } else {
+            None
+        }
     }
 
     /// Returns a view into this header as a byte array.
@@ -273,9 +290,9 @@ impl Header {
     /// May return an error if the field is corrupted.
     pub fn size(&self) -> io::Result<u64> {
         if self.entry_type().is_gnu_sparse() {
-            self.as_gnu().ok_or_else(|| {
-                other("sparse header was not a gnu header")
-            }).and_then(|h| h.real_size())
+            self.as_gnu()
+                .ok_or_else(|| other("sparse header was not a gnu header"))
+                .and_then(|h| h.real_size())
         } else {
             self.entry_size()
         }
@@ -324,7 +341,7 @@ impl Header {
 
     fn _set_path(&mut self, path: &Path) -> io::Result<()> {
         if let Some(ustar) = self.as_ustar_mut() {
-            return ustar.set_path(path)
+            return ustar.set_path(path);
         }
         copy_path_into(&mut self.as_old_mut().name, path, false)
     }
@@ -453,7 +470,7 @@ impl Header {
     /// user name or the name is too long.
     pub fn set_username(&mut self, name: &str) -> io::Result<()> {
         if let Some(ustar) = self.as_ustar_mut() {
-            return ustar.set_username(name)
+            return ustar.set_username(name);
         }
         if let Some(gnu) = self.as_gnu_mut() {
             gnu.set_username(name)
@@ -495,7 +512,7 @@ impl Header {
     /// group name or the name is too long.
     pub fn set_groupname(&mut self, name: &str) -> io::Result<()> {
         if let Some(ustar) = self.as_ustar_mut() {
-            return ustar.set_groupname(name)
+            return ustar.set_groupname(name);
         }
         if let Some(gnu) = self.as_gnu_mut() {
             gnu.set_groupname(name)
@@ -527,7 +544,7 @@ impl Header {
     /// major device number.
     pub fn set_device_major(&mut self, major: u32) -> io::Result<()> {
         if let Some(ustar) = self.as_ustar_mut() {
-            return Ok(ustar.set_device_major(major))
+            return Ok(ustar.set_device_major(major));
         }
         if let Some(gnu) = self.as_gnu_mut() {
             Ok(gnu.set_device_major(major))
@@ -559,7 +576,7 @@ impl Header {
     /// minor device number.
     pub fn set_device_minor(&mut self, minor: u32) -> io::Result<()> {
         if let Some(ustar) = self.as_ustar_mut() {
-            return Ok(ustar.set_device_minor(minor))
+            return Ok(ustar.set_device_minor(minor));
         }
         if let Some(gnu) = self.as_gnu_mut() {
             Ok(gnu.set_device_minor(minor))
@@ -595,8 +612,6 @@ impl Header {
 
     #[cfg(unix)]
     fn fill_from(&mut self, meta: &fs::Metadata) {
-        use libc;
-
         self.set_mode(meta.mode() as u32);
         self.set_mtime(meta.mtime() as u64);
         self.set_uid(meta.uid() as u32);
@@ -697,27 +712,31 @@ impl UstarHeader {
         // components where it can fit in name/prefix. To do that we peel off
         // enough until the path fits in `prefix`, then we try to put both
         // halves into their destination.
-        let bytes = try!(path2bytes(path));
+        let bytes = path2bytes(path)?;
         let (maxnamelen, maxprefixlen) = (self.name.len(), self.prefix.len());
         if bytes.len() <= maxnamelen {
-            try!(copy_path_into(&mut self.name, path, false));
+            copy_path_into(&mut self.name, path, false)?;
         } else {
             let mut prefix = path;
             let mut prefixlen;
             loop {
                 match prefix.parent() {
                     Some(parent) => prefix = parent,
-                    None => return Err(other("path cannot be split to be \
-                                              inserted into archive")),
+                    None => {
+                        return Err(other(
+                            "path cannot be split to be \
+                                              inserted into archive",
+                        ))
+                    }
                 }
-                prefixlen = try!(path2bytes(prefix)).len();
+                prefixlen = path2bytes(prefix)?.len();
                 if prefixlen <= maxprefixlen {
-                    break
+                    break;
                 }
             }
-            try!(copy_path_into(&mut self.prefix, prefix, false));
-            let path = try!(bytes2path(Cow::Borrowed(&bytes[prefixlen + 1..])));
-            try!(copy_path_into(&mut self.name, &path, false));
+            copy_path_into(&mut self.prefix, prefix, false)?;
+            let path = bytes2path(Cow::Borrowed(&bytes[prefixlen + 1..]))?;
+            copy_path_into(&mut self.name, &path, false)?;
         }
         Ok(())
     }
@@ -914,7 +933,7 @@ fn octal_from(slice: &[u8]) -> io::Result<u64> {
     };
     match u64::from_str_radix(num.trim(), 8) {
         Ok(n) => Ok(n),
-        Err(_) => Err(other("numeric field was not a number"))
+        Err(_) => Err(other("numeric field was not a number")),
     }
 }
 
@@ -956,45 +975,40 @@ fn copy_into(slot: &mut [u8], bytes: &[u8]) -> io::Result<()> {
 /// * a nul byte was found
 /// * an invalid path component is encountered (e.g. a root path or parent dir)
 /// * the path itself is empty
-fn copy_path_into(mut slot: &mut [u8],
-                  path: &Path,
-                  is_link_name: bool) -> io::Result<()> {
+fn copy_path_into(mut slot: &mut [u8], path: &Path, is_link_name: bool) -> io::Result<()> {
     let mut emitted = false;
     for component in path.components() {
-        let bytes = try!(path2bytes(Path::new(component.as_os_str())));
+        let bytes = path2bytes(Path::new(component.as_os_str()))?;
         match component {
-            Component::Prefix(..) |
-            Component::RootDir => {
+            Component::Prefix(..) | Component::RootDir => {
                 return Err(other("paths in archives must be relative"))
             }
-            Component::ParentDir if is_link_name => {},
-            Component::ParentDir => {
-                return Err(other("paths in archives must not have `..`"))
-            }
+            Component::ParentDir if is_link_name => {}
+            Component::ParentDir => return Err(other("paths in archives must not have `..`")),
             Component::CurDir => continue,
             Component::Normal(_) => {}
         };
         if emitted {
-            try!(copy(&mut slot, &[b'/']));
+            copy(&mut slot, &[b'/'])?;
         }
         if bytes.contains(&b'/') {
             if let Component::Normal(..) = component {
-                return Err(other("path component in archive cannot contain `/`"))
+                return Err(other("path component in archive cannot contain `/`"));
             }
         }
-        try!(copy(&mut slot, bytes));
+        copy(&mut slot, bytes)?;
         emitted = true;
     }
     if !emitted {
-        return Err(other("paths in archives must have at least one component"))
+        return Err(other("paths in archives must have at least one component"));
     }
     if ends_with_slash(path) {
-        try!(copy(&mut slot, &[b'/']));
+        copy(&mut slot, &[b'/'])?;
     }
     return Ok(());
 
     fn copy(slot: &mut &mut [u8], bytes: &[u8]) -> io::Result<()> {
-        try!(copy_into(*slot, bytes));
+        copy_into(*slot, bytes)?;
         let tmp = mem::replace(slot, &mut []);
         *slot = &mut tmp[bytes.len()..];
         Ok(())
@@ -1013,9 +1027,10 @@ fn ends_with_slash(p: &Path) -> bool {
 
 #[cfg(windows)]
 pub fn path2bytes(p: &Path) -> io::Result<&[u8]> {
-    p.as_os_str().to_str().map(|s| s.as_bytes()).ok_or_else(|| {
-        other("path was not valid unicode")
-    })
+    p.as_os_str()
+        .to_str()
+        .map(|s| s.as_bytes())
+        .ok_or_else(|| other("path was not valid unicode"))
 }
 
 #[cfg(unix)]
@@ -1027,15 +1042,11 @@ pub fn path2bytes(p: &Path) -> io::Result<&[u8]> {
 pub fn bytes2path(bytes: Cow<[u8]>) -> io::Result<Cow<Path>> {
     return match bytes {
         Cow::Borrowed(bytes) => {
-            let s = try!(str::from_utf8(bytes).map_err(|_| {
-                not_unicode()
-            }));
+            let s = str::from_utf8(bytes).map_err(|_| not_unicode())?;
             Ok(Cow::Borrowed(Path::new(s)))
         }
         Cow::Owned(bytes) => {
-            let s = try!(String::from_utf8(bytes).map_err(|_| {
-                not_unicode()
-            }));
+            let s = String::from_utf8(bytes).map_err(|_| not_unicode())?;
             Ok(Cow::Owned(PathBuf::from(s)))
         }
     };
@@ -1050,11 +1061,7 @@ pub fn bytes2path(bytes: Cow<[u8]>) -> io::Result<Cow<Path>> {
     use std::ffi::{OsStr, OsString};
 
     Ok(match bytes {
-        Cow::Borrowed(bytes) => Cow::Borrowed({
-            Path::new(OsStr::from_bytes(bytes))
-        }),
-        Cow::Owned(bytes) => Cow::Owned({
-            PathBuf::from(OsString::from_vec(bytes))
-        })
+        Cow::Borrowed(bytes) => Cow::Borrowed(Path::new(OsStr::from_bytes(bytes))),
+        Cow::Owned(bytes) => Cow::Owned(PathBuf::from(OsString::from_vec(bytes))),
     })
 }
