@@ -34,7 +34,7 @@ function die () {
 
 function build_image () {
     tag=$(date +%Y%m%d)
-    docker build -t $image_name:$tag bundler/
+    docker build -t $image_name:$tag bundler-image/
     docker tag $image_name:$tag $image_name:latest
 }
 
@@ -160,34 +160,8 @@ function make_base_zipfile () {
 
 function update_containers () {
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
-    mkdir -p $state_dir/containers $state_dir/versioned
+    mkdir -p $state_dir/containers
     docker run --rm -v $state_dir:/state:rw,z $image_name update-containers
-
-    # Make versioned copies of unmodified packages.
-
-    cd "$state_dir"
-
-    (cd containers/archive && ls -1) |while read cname ; do
-	keep=false
-	# TBD: are we going to need versioned packages of the binaries?
-	case $cname in
-	    *.doc.tar.xz | *.source.tar.xz | *.*-*.tar.xz | *.win32.tar.xz) ;;
-	    *.tar.xz) keep=true ;;
-	esac
-	$keep || continue
-
-	pkg=$(basename $cname .tar.xz)
-	new=containers/archive/$cname
-	tlp=tlpkg/tlpobj/$pkg.tlpobj
-	rev=$(tar xf $new -O $tlp |grep ^revision |awk '{print $2}')
-	versioned=versioned/$pkg-$rev.tar.xz
-
-	if [ ! -f $versioned ] ; then
-	    echo $pkg $rev
-	    cp $new $versioned
-	    chmod 444 $versioned
-	fi
-    done
 }
 
 
