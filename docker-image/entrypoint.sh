@@ -11,10 +11,11 @@ if [ -z "$1" -o "$1" = help ] ; then
     echo "You must supply a subcommand to run in the container. Commands are:
 
 bash              -- Run a bash shell
-install-profile   -- Create an installation based on a fixed TeXLive \"profile\" file.
+install-profile   -- Create an installation based on a TeXLive \"profile\" template.
+python            -- Run a Python script
 update-containers -- Rebuild the TeXLive \"container\" files
 
-Use 'docker run -it bundlercontainer bash' to launch an interactive
+Use 'docker run --rm -it bundlercontainer bash' to launch an interactive
 shell within a long-running container.
 "
     exit 1
@@ -48,6 +49,24 @@ function _precise_version () {
 
 
 function install_profile () {
+    profile_template="$1"
+    shift
+    install_dest="$1"
+    shift
+    chown_spec="$1"
+    shift
+
+    profile="$(mktemp)"
+    sed -e "s|@dest@|$install_dest|g" <"$profile_template" >"$profile"
+
+    cd /state/repo/
+    _precise_version "$install_dest"
+    Master/install-tl --repository /state/containers --profile "$profile"
+    chown -R "$chown_spec" "$install_dest"
+}
+
+
+function OLD_install_profile () {
     profile="$1"
     shift
     install_dest="$1"
@@ -68,7 +87,6 @@ function install_profile () {
     chown -R "$chown_spec" "$install_dest"
 }
 
-
 function update_containers () {
     cd /state/repo/
     _precise_version /state/containers
@@ -86,6 +104,8 @@ function update_containers () {
 
 if [ "$command" = bash ] ; then
     exec bash "$@"
+elif [ "$command" = python ] ; then
+    exec python3 "$@"
 elif [ "$command" = install-profile ] ; then
     install_profile "$@"
 elif [ "$command" = update-containers ] ; then

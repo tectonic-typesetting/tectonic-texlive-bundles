@@ -4,6 +4,7 @@
 
 image_name=tectonic-texlive-bundler
 bundler_cont_name=tectonic-bld-cont
+source_dir="$(cd $(dirname "$0") && pwd)"
 state_dir=$(pwd)/state # symlink here!
 
 set -e
@@ -34,69 +35,31 @@ function die () {
 
 function build_image () {
     tag=$(date +%Y%m%d)
-    docker build -t $image_name:$tag bundler-image/
+    docker build -t $image_name:$tag docker-image/
     docker tag $image_name:$tag $image_name:latest
 }
 
 
 function bundler_bash () {
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
-    exec docker run -it --rm -v $state_dir:/state:rw,z $image_name bash
+    exec docker run -it --rm -v $source_dir:/source:ro,z -v $state_dir:/state:rw,z $image_name bash
 }
 
 
 function make_installation () {
-    # arguments: names of TeXLive packages to install above and beyond the
-    # "minimal" installation profile.
+    bundle_dir="$1"
+    shift
+
+    if [ ! -f "$bundle_dir/bundle.cfg" ] ; then
+        die "usage: $0 make-installation <bundle-dir> [...]"
+    fi
+
+    bundle_dir="$(cd "$bundle_dir" && pwd)"
 
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
 
-    dest=$(mktemp -d -p $state_dir install.XXXXXX)
-    destbase=$(basename $dest)
-    cdest=/state/$destbase
-
-    # $cdest/texmf-dist is created and populated with most files.
-    # TEXMFSYSCONFIG and TEXMFSYSVAR are filled with files that we might care about.
-    # TEXMFLOCAL is created but doesn't have anything we care about.
-    # TEXMFHOME, TEXMFCONFIG, and TEXMFVAR are not created.
-    # option_sys_* are not created either.
-    # Other settings are best guesses about what's sensible.
-
-    cat >$dest/bundler.profile <<-EOF
-    selected_scheme scheme-minimal
-    TEXDIR $cdest
-    TEXMFSYSCONFIG $cdest/texmf-dist
-    TEXMFSYSVAR $cdest/texmf-dist
-    TEXMFLOCAL $cdest/texmf-local
-    TEXMFHOME $cdest/texmf-home
-    TEXMFCONFIG $cdest/texmf-config
-    TEXMFVAR $cdest/texmf-var
-    collection-basic 1
-    option_adjustrepo 1
-    option_autobackup 0
-    option_desktop_integration 0
-    option_doc 0
-    option_file_assocs 0
-    option_fmt 1
-    option_letter 1
-    option_path 0
-    option_post_code 1
-    option_src 0
-    option_sys_bin $cdest/sys-bin
-    option_sys_info $cdest/sys-info
-    option_sys_man $cdest/sys-man
-    option_w32_multi_user 0
-    option_write18_restricted 0
-    portable 0
-EOF
-    echo $dest
-    echo >&2 "Logging installation to $dest/outer.log ..."
-    set +e
-    docker run --rm -v $state_dir:/state:rw,z $image_name \
-	   install-profile $cdest/bundler.profile $cdest $(id -u):$(id -g) "$@" &>$dest/outer.log
-    ec=$?
-    [ $ec -eq 0 ] || die "install-tl failed; see $dest/outer.log"
-    set -e
+    exec docker run -it --rm -v $source_dir:/source:ro,z -v $state_dir:/state:rw,z -v $bundle_dir:/bundle:rw,z $image_name \
+        python /source/scripts/make-installation.py "$@"
 }
 
 

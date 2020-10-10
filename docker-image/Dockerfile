@@ -1,10 +1,12 @@
 # Copyright 2016-2020 the Tectonic Project.
 # Licensed under the MIT License.
 #
-# See ../bundler.sh for a simple build recipe.
+# See ../driver.sh for a simple build recipe.
 
 FROM ubuntu:20.04
 
+VOLUME /bundle/
+VOLUME /source/
 VOLUME /state/
 
 COPY setup.sh /

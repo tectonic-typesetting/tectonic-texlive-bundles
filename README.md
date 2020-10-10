@@ -18,7 +18,6 @@ To do this, you will need at a minimum:
   (`git://git.texlive.info/texlive.git`), placed or symlinked in a subdirectory
   named `state/repo` below this file. Be aware that this repository currently
   weighs in at **40 gigabytes**!
-- A Python 3 interpreter.
 
 Data files associated with the staging process will land in other subdirectories
 of `state/`.
@@ -31,7 +30,7 @@ computations — this promotes reproducibility and portability, regardless of wh
 kind of system you are using. To create this container, run:
 
 ```
-./bundler.sh build-image
+./driver.sh build-image
 ```
 
 
@@ -46,7 +45,7 @@ To create TeXLive container files for all of the packages associated with your
 TeXLive checkout, run:
 
 ```
-./bundler.sh update-containers
+./driver.sh update-containers
 ```
 
 This will use the Docker container to generate TeXLive container files in
@@ -60,14 +59,14 @@ TeXLive tree you currently have checked out in `state/repo`.*
 
 Once you have created your TeXLive containers, the script
 `make-zipfile.py` can compile them into a single master Zip file. The
-operation `./bundler.sh make-base-zipfile $DESTPATH` will do this for the
+operation `./driver.sh make-base-zipfile $DESTPATH` will do this for the
 standard Tectonic base bundle, `tlextras`. It does so using the helper
-`./bundler.sh make-installation`.
+`./driver.sh make-installation`.
 
 
 ## Creating the “indexed tar” bundle
 
-For bundles to be hosted on the web, the operation `./bundler.sh zip2itar` will
+For bundles to be hosted on the web, the operation `./driver.sh zip2itar` will
 convert the resulting Zip file to the “indexed tar” format used for Web-based
 bundles. **TODO**: this is not adequately documented at all.
 

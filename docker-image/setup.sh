@@ -4,15 +4,17 @@
 #
 # Set up an image that's ready to generate TeXLive packages reproducibly.
 
-texlive_deps="
+deps="
 libdigest-perl-md5-perl
 libfontconfig1
 git-core
+python3
+python3-pytoml
 wget
 "
 
 set -ex
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends $texlive_deps
+DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends $deps
 rm -rf /var/lib/apt/lists/*
 rm -f /setup.sh  # self-destruct!
