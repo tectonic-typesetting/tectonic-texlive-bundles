@@ -88,10 +88,11 @@ program with the `-b` argument.
 This step is needed to create a bundle that will be hosted on the web. Run:
 
 ```
-./driver.sh zip2itar path/to/output.zip
+./driver.sh make-itar bundles/tlextras
 ```
 
-This will create `path/to/output.tar` and `path/to/output.tar.index.gz`.
+This will create both the `.tar` and the `.tar.index.gz` files that need to be
+uploaded for use as a web bundle.
 
 
 #### Copyright and Licensing

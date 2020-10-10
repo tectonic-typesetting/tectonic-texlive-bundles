@@ -22,9 +22,9 @@ if [ -z "$1" -o "$1" = help ] ; then
 build-image       -- Create or update the bundler Docker image.
 bundler-bash      -- Run a shell in a temporary bundler container.
 make-installation -- Install TeXLive into a new directory tree.
+make-itar         -- Convert a bundle from Zip format to indexed-tar format.
 make-zipfile      -- Make a Zip file from a TeXLive installation tree.
 update-containers -- Rebuild the TeXLive \"container\" files.
-zip2itar          -- Convert a bundle from Zip format to indexed-tar format.
 
 "
     exit 1
@@ -85,17 +85,29 @@ function install_packages () {
 
 function make_installation () {
     bundle_dir="$1"
-    shift
-
-    if [ -z "$bundle_dir" ] ; then
-        die "usage: $0 make-installation <bundle-dir>"
-    fi
+    shift || die "usage: $0 make-installation <bundle-dir>"
 
     use_bundle "$bundle_dir"
     require_repo
 
     exec docker run -it --rm "${docker_args[@]}" $image_name \
         python /source/scripts/make-installation.py "$@"
+}
+
+
+function make_itar () {
+    bundle_dir="$1"
+    shift || die "usage: $0 make-itar <bundle-dir>"
+
+    use_bundle "$bundle_dir"
+
+    ziprel="$(docker run --rm "${docker_args[@]}" $image_name python /source/scripts/misc.py zip-relpath)"
+    dir=$(cd $(dirname "$ziprel") && pwd)
+    zipfull=$dir/$(basename "$ziprel")
+    tarfull=$dir/$(basename "$ziprel" .zip).tar
+    echo "Generating $tarfull ..."
+    cd $(dirname $0)/zip2tarindex
+    exec cargo run --release -- "$zipfull" "$tarfull"
 }
 
 
@@ -117,23 +129,6 @@ function update_containers () {
 }
 
 
-function zip2itar () {
-    zipfile="$1"
-    shift || die "usage: $0 zip2iter <zipfile>"
-
-    if [ ! -f "$zipfile" ] ; then
-        die "no such input file \"$zipfile\""
-    fi
-
-    dir=$(cd $(dirname "$zipfile") && pwd)
-    zipfull=$dir/$(basename "$zipfile")
-    tarfull=$dir/$(basename "$zipfile" .zip).tar
-    echo "Generating $tarfull ..."
-    cd $(dirname $0)/zip2tarindex
-    exec cargo run --release -- "$zipfull" "$tarfull"
-}
-
-
 # Dispatch subcommands.
 
 case "$command" in
@@ -145,12 +140,12 @@ case "$command" in
         install_packages "$@" ;;
     make-installation)
         make_installation "$@" ;;
+    make-itar)
+        make_itar "$@" ;;
     make-zipfile)
         make_zipfile "$@" ;;
     update-containers)
         update_containers "$@" ;;
-    zip2itar)
-        zip2itar "$@" ;;
     *)
         echo >&2 "error: unrecognized command \"$command\"."
         exit 1 ;;
