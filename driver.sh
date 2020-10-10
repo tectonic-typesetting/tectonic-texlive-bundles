@@ -11,6 +11,7 @@ docker_args=(
     -e HOSTUID=$(id -u)
     -e HOSTGID=$(id -u)
     -v "$source_dir":/source:ro,z
+    -v "$state_dir":/state:rw,z
 )
 
 set -e
@@ -38,6 +39,25 @@ function die () {
     exit 1
 }
 
+function require_repo() {
+    [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
+}
+
+function use_bundle() {
+    bundle_dir="$1"
+    shift
+
+    if [ ! -f "$bundle_dir/bundle.toml" ] ; then
+        die "bundle directory \`$bundle_dir\` looks invalid (no bundle.toml)"
+    fi
+
+    bundle_dir="$(cd "$bundle_dir" && pwd)"
+    docker_args+=(
+        -v "$bundle_dir":/bundle:rw,z
+    )
+}
+
+# Subcommands (alphabetical order):
 
 function build_image () {
     tag=$(date +%Y%m%d)
@@ -47,8 +67,7 @@ function build_image () {
 
 
 function bundler_bash () {
-    [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
-    exec docker run -it --rm "${docker_args[@]}" -v $state_dir:/state:rw,z $image_name bash
+    exec docker run -it --rm "${docker_args[@]}" $image_name bash
 }
 
 
@@ -56,15 +75,14 @@ function install_packages () {
     bundle_dir="$1"
     shift
 
-    if [ ! -f "$bundle_dir/bundle.toml" ] ; then
-        die "usage: $0 install-packages <bundle-dir> [...]"
+    if [ -z "$bundle_dir" ] ; then
+        die "usage: $0 install-packages <bundle-dir>"
     fi
 
-    bundle_dir="$(cd "$bundle_dir" && pwd)"
+    use_bundle "$bundle_dir"
+    require_repo
 
-    [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
-
-    exec docker run -it --rm "${docker_args[@]}" -v $state_dir:/state:rw,z -v $bundle_dir:/bundle:rw,z $image_name \
+    exec docker run -it --rm "${docker_args[@]}" $image_name \
         python /source/scripts/install-packages.py "$@"
 }
 
@@ -73,79 +91,39 @@ function make_installation () {
     bundle_dir="$1"
     shift
 
-    if [ ! -f "$bundle_dir/bundle.toml" ] ; then
-        die "usage: $0 make-installation <bundle-dir> [...]"
+    if [ -z "$bundle_dir" ] ; then
+        die "usage: $0 make-installation <bundle-dir>"
     fi
 
-    bundle_dir="$(cd "$bundle_dir" && pwd)"
+    use_bundle "$bundle_dir"
+    require_repo
 
-    [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
-
-    exec docker run -it --rm "${docker_args[@]}" -v $state_dir:/state:rw,z -v $bundle_dir:/bundle:rw,z $image_name \
+    exec docker run -it --rm "${docker_args[@]}" $image_name \
         python /source/scripts/make-installation.py "$@"
 }
 
 
 function make_base_zipfile () {
+    bundle_dir="$1"
+    shift
     zip="$1"
-
-    if [ -z "$zip" ] ; then
-        die "usage: $0 make-base-zipfile <output-zip-filename>"
-    fi
-
-    bundle_id=tlextras2018
     shift
 
-    # First, TeXLive package installation.
+    if [ -z "$zip" ] ; then
+        die "usage: $0 make-base-zipfile <bundle-dir> <output-zip-filename>"
+    fi
 
-    installdir=$(make_installation \
-         collection-basic \
-         collection-bibtexextra \
-         collection-fontsextra \
-         collection-fontsrecommended \
-         collection-humanities \
-         collection-latexextra \
-         collection-latexrecommended \
-         collection-latex \
-         collection-luatex \
-         collection-mathscience \
-         collection-music \
-         collection-pictures \
-         collection-plaingeneric \
-         collection-publishers \
-         collection-xetex \
-         collection-langarabic \
-         collection-langchinese \
-         collection-langcjk \
-         collection-langcyrillic \
-         collection-langczechslovak \
-         collection-langenglish \
-         collection-langeuropean \
-         collection-langfrench \
-         collection-langgerman \
-         collection-langgreek \
-         collection-langitalian \
-         collection-langjapanese \
-         collection-langkorean \
-         collection-langother \
-         collection-langpolish \
-         collection-langportuguese \
-         collection-langspanish
-    )
+    use_bundle "$bundle_dir"
 
-    # Some manual fiddles for format file generation
+    echo XXX TODO COPY IN EXTRAS
 
-    cp extras/$bundle_id/* $installdir/texmf-dist/
-
-    # Finally, turn it all into a Zip file.
-
-    ./bundler/make-zipfile.py "$installdir" "$zip"
-    rm -rf "$installdir"
+    exec docker run -it --rm "${docker_args[@]}" $image_name \
+        python /source/scripts/make-zipfile.py "$zip" "$@"
 }
 
 
 function update_containers () {
-    [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
+    require_repo
     mkdir -p $state_dir/containers
     docker run --rm -v $state_dir:/state:rw,z $image_name update-containers
 }
