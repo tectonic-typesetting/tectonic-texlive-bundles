@@ -30,6 +30,30 @@ def entrypoint(argv):
     with open(bundle.path('packages.txt')) as f:
         packages = [l.strip() for l in f]
 
+    # Validate that current repo, containers, and install are in sync
+
+    git_hash, _ = get_repo_version()
+
+    with open('/state/containers/GITHASH') as f:
+        container_git_hash = f.readline().strip()
+
+    if git_hash != container_git_hash:
+        die(
+            'refusing to proceed since current repo hash {git_hash} does not agree '
+            'with that used to make containers; rerun `update-containers` step?'
+        )
+
+    with open(os.path.join(install_dir, 'GITHASH')) as f:
+        install_git_hash = f.readline().strip()
+
+    if git_hash != install_git_hash:
+        die(
+            'refusing to proceed since current repo hash {git_hash} does not agree '
+            'with that used to make the installtion; recreate it?'
+        )
+
+    # OK, looks good
+
     try:
         # Note: the leading `./` in the exe path is vital so that the Perl code
         # can figure out its module search path.

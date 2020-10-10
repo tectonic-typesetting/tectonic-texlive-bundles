@@ -26,6 +26,21 @@ def entrypoint(argv):
     bundle = Bundle.open_default()
     install_dir = bundle.install_dir()
 
+    # Validate that our current repo and the containers are in sync
+
+    git_hash, svn_rev = get_repo_version()
+
+    with open('/state/containers/GITHASH') as f:
+        container_git_hash = f.readline().strip()
+
+    if git_hash != container_git_hash:
+        die(
+            'refusing to proceed since current repo hash {git_hash} does not agree '
+            'with that used to make containers; rerun `update-containers` step?'
+        )
+
+    # OK, good to go
+
     try:
         os.makedirs(install_dir)
     except Exception as e:
@@ -34,6 +49,12 @@ def entrypoint(argv):
     chown_host('/state/installs', recursive=False)  # make sure this one is host-owned
 
     try:
+        with open(os.path.join(install_dir, 'GITHASH'), 'wt') as f:
+            print(git_hash, file=f)
+
+        with open(os.path.join(install_dir, 'SVNREV'), 'wt') as f:
+            print(svn_rev, file=f)
+
         log_path = os.path.join(install_dir, 'ttb-install.log')
 
         with bundle.create_texlive_profile() as profile_path:

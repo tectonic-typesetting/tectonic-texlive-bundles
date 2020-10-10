@@ -22,6 +22,7 @@ ZipMaker
 chown_host
 cpath2qhpath
 die
+get_repo_version
 warn
 '''.split()
 
@@ -30,6 +31,7 @@ import hashlib
 import os.path
 import pytoml
 import struct
+import subprocess
 import sys
 import tempfile
 
@@ -65,6 +67,46 @@ def cpath2qhpath(container_path):
         return f'`{container_path[1:]}`'
 
     return f'(container path) `{container_path}``'
+
+
+def get_repo_version():
+    """
+    Returns (git-hash-as-hex-text, svn-revision)
+    """
+
+    subprocess.check_call(
+        ['git', 'update-index', '-q', '--refresh'],
+        cwd = '/state/repo',
+    )
+
+    output = subprocess.check_output(
+        ['git', 'diff-index', '--name-only', 'HEAD', '--'],
+        cwd = '/state/repo',
+    )
+    if len(output):
+        raise Exception('refusing to work from a modified TeXLive Git checkout')
+
+    output = subprocess.check_output(
+        ['git', 'show-ref', '--head'],
+        cwd = '/state/repo',
+    )
+    head_hash = output.split(b' ', 1)[0]
+    head_hash = head_hash.decode('ascii')
+
+    output = subprocess.check_output(
+        ['git', 'show', '-s'],
+        cwd = '/state/repo',
+    )
+    svn_rev = 'unknown'
+    for line in output.splitlines():
+        if b'git-svn-id:' in line:
+            idx = line.index(b'@')
+            line = line[idx+1:]
+            svn_rev = line.split(b' ', 1)[0]
+            svn_rev = svn_rev.decode('ascii')
+            break
+
+    return head_hash, svn_rev
 
 
 class Bundle(object):
