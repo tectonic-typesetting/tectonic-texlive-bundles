@@ -7,13 +7,6 @@ This script is meant to be run inside the TeXLive bundler Docker container.
 
 Create a TeXLive installation from a given bundle specification.
 
-Fixed characteristics of the environment:
-
-- Source tree for the tools is in /source/
-- Data/state directory is /state/
-- TeXLive repository is in /state/repo/
-- Bundle specification is in /bundle/
-
 """
 
 import argparse

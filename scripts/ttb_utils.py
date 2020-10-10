@@ -4,6 +4,16 @@
 
 """
 Utilities for the Tectonic bundler infrastructure.
+
+Fixed characteristics of the environment:
+
+- Source tree for the tools is in /source/
+- Data/state directory is /state/
+- TeXLive repository is in /state/repo/
+- Bundle specification is in /bundle/
+- The numeric UID and GID of the executing user in the host environment are
+  stored in the environment variables $HOSTUID and $HOSTGID.
+
 """
 
 __all__ = '''
