@@ -22,7 +22,7 @@ if [ -z "$1" -o "$1" = help ] ; then
 build-image       -- Create or update the bundler Docker image.
 bundler-bash      -- Run a shell in a temporary bundler container.
 make-installation -- Install TeXLive into a new directory tree.
-make-base-zipfile -- Make a Zip file of a standardized base TeXLive installation.
+make-zipfile      -- Make a Zip file from a TeXLive installation tree.
 update-containers -- Rebuild the TeXLive \"container\" files.
 zip2itar          -- Convert a bundle from Zip format to indexed-tar format.
 
@@ -103,14 +103,14 @@ function make_installation () {
 }
 
 
-function make_base_zipfile () {
+function make_zipfile () {
     bundle_dir="$1"
     shift
     zip="$1"
     shift
 
     if [ -z "$zip" ] ; then
-        die "usage: $0 make-base-zipfile <bundle-dir> <output-zip-filename>"
+        die "usage: $0 make-zipfile <bundle-dir> <output-zip-filename>"
     fi
 
     use_bundle "$bundle_dir"
@@ -154,8 +154,8 @@ case "$command" in
         install_packages "$@" ;;
     make-installation)
         make_installation "$@" ;;
-    make-base-zipfile)
-        make_base_zipfile "$@" ;;
+    make-zipfile)
+        make_zipfile "$@" ;;
     update-containers)
         update_containers "$@" ;;
     zip2itar)
