@@ -136,8 +136,30 @@ class Bundle(object):
         return os.path.join('/state/installs', f'{self.name}-{self.version}', *segments)
 
 
-    def artifact_path(self, *segments0:)
+    def artifact_path(self, *segments):
         return os.path.join('/state/artifacts', f'{self.name}-{self.version}', *segments)
+
+
+    def zip_path(self):
+        return self.artifact_path(f'{self.name}-{self.version}.zip')
+
+
+    def tar_path(self):
+        return self.artifact_path(f'{self.name}-{self.version}.tar')
+
+
+    def listing_path(self):
+        return self.artifact_path(f'{self.name}-{self.version}.listing.txt')
+
+
+    def digest_path(self):
+        return self.artifact_path(f'{self.name}-{self.version}.sha256sum')
+
+
+    def ensure_artfact_dir(self):
+        path = self.artifact_path()
+        os.makedirs(path, exist_ok=True)
+        chown_host(path)
 
 
     @contextlib.contextmanager
@@ -285,6 +307,7 @@ class ZipMaker(object):
 
         p = os.path.join(install_dir, 'texmf-dist')
         n = len(p) + 1
+        print(f'Scanning {cpath2qhpath(p)} ...')
 
         for dirpath, _, filenames in os.walk(p, onerror=self._walk_onerr):
             for fn in filenames:
@@ -294,6 +317,7 @@ class ZipMaker(object):
 
         # Compute a hash of it all.
 
+        print('Computing final hash ...')
         s = hashlib.sha256()
         s.update(struct.pack('>I', len(self.item_shas)))
         s.update(b'\0')
@@ -306,20 +330,28 @@ class ZipMaker(object):
         self.final_hexdigest = s.hexdigest()
         self.zip.writestr('SHA256SUM', self.final_hexdigest)
 
-        # Report clashes
+        # Report clashes if needed
 
         if len(self.clashes):
-            warn('clashing basenames were observed:')
-            print('', file=sys.stderr)
+            warn(f'{len(self.clashes)} clashing basenames were observed')
 
-            for base in sorted(self.clashes.keys()):
-                print(f'  {base}:', file=sys.stderr)
-                bydigest = self.clashes[base]
+            report_path = self.bundle.artifact_path('clash-report.txt')
+            warn(f'logging clash report to {cpath2qhpath(report_path)}')
 
-                for digest in sorted(bydigest.keys()):
-                    print(f'    {digest.hex()[:8]}:', file=sys.stderr)
+            with open(report_path, 'wt') as f:
+                for base in sorted(self.clashes.keys()):
+                    print(f'{base}:', file=f)
+                    bydigest = self.clashes[base]
 
-                    for full in sorted(bydigest[digest]):
-                        print(f'       {full[n:]}', file=sys.stderr)
+                    for digest in sorted(bydigest.keys()):
+                        print(f'  {digest.hex()[:8]}:', file=f)
 
-            print('', file=sys.stderr)
+                        for full in sorted(bydigest[digest]):
+                            print(f'     {full[n:]}', file=f)
+
+            chown_host(report_path)
+
+
+    def write_listing(self, stream):
+        for base in sorted(self.item_shas.keys()):
+            print(base, file=stream)

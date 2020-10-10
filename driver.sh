@@ -73,11 +73,7 @@ function bundler_bash () {
 
 function install_packages () {
     bundle_dir="$1"
-    shift
-
-    if [ -z "$bundle_dir" ] ; then
-        die "usage: $0 install-packages <bundle-dir>"
-    fi
+    shift || die "usage: $0 install-packages <bundle-dir>"
 
     use_bundle "$bundle_dir"
     require_repo
@@ -105,18 +101,12 @@ function make_installation () {
 
 function make_zipfile () {
     bundle_dir="$1"
-    shift
-    zip="$1"
-    shift
-
-    if [ -z "$zip" ] ; then
-        die "usage: $0 make-zipfile <bundle-dir> <output-zip-filename>"
-    fi
+    shift || die "usage: $0 make-zipfile <bundle-dir>"
 
     use_bundle "$bundle_dir"
 
     exec docker run -it --rm "${docker_args[@]}" $image_name \
-        python /source/scripts/make-zipfile.py "$zip" "$@"
+        python /source/scripts/make-zipfile.py "$@"
 }
 
 
@@ -129,6 +119,7 @@ function update_containers () {
 
 function zip2itar () {
     zipfile="$1"
+    shift || die "usage: $0 zip2iter <zipfile>"
 
     if [ ! -f "$zipfile" ] ; then
         die "no such input file \"$zipfile\""

@@ -74,7 +74,7 @@ Run:
 Run:
 
 ```
-./driver.sh make-zipfile bundles/tlextras path/to/output.zip
+./driver.sh make-zipfile bundles/tlextras
 ```
 
 A local copy of this bundle file can be used with the `tectonic` command-line
