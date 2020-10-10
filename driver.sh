@@ -52,6 +52,23 @@ function bundler_bash () {
 }
 
 
+function install_packages () {
+    bundle_dir="$1"
+    shift
+
+    if [ ! -f "$bundle_dir/bundle.toml" ] ; then
+        die "usage: $0 install-packages <bundle-dir> [...]"
+    fi
+
+    bundle_dir="$(cd "$bundle_dir" && pwd)"
+
+    [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
+
+    exec docker run -it --rm "${docker_args[@]}" -v $state_dir:/state:rw,z -v $bundle_dir:/bundle:rw,z $image_name \
+        python /source/scripts/install-packages.py "$@"
+}
+
+
 function make_installation () {
     bundle_dir="$1"
     shift
@@ -157,6 +174,8 @@ case "$command" in
         build_image "$@" ;;
     bundler-bash)
         bundler_bash "$@" ;;
+    install-packages)
+        install_packages "$@" ;;
     make-installation)
         make_installation "$@" ;;
     make-base-zipfile)
