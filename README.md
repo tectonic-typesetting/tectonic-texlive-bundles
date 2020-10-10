@@ -31,7 +31,7 @@ computations — this promotes reproducibility and portability, regardless of wh
 kind of system you are using. To create this container, run:
 
 ```
-./staging.sh build-image
+./bundler.sh build-image
 ```
 
 
@@ -46,7 +46,7 @@ To create TeXLive container files for all of the packages associated with your
 TeXLive checkout, run:
 
 ```
-./staging.sh update-containers
+./bundler.sh update-containers
 ```
 
 This will use a Docker builder container to generate TeXLive container files in
@@ -60,14 +60,14 @@ TeXLive tree you currently have checked out in `state/repo`.*
 
 Once you have created your TeXLive containers, the script
 `builder/make-zipfile.py` can compile them into a single master Zip file. The
-operation `./staging.sh make-base-zipfile $DESTPATH` will do this for the
+operation `./bundler.sh make-base-zipfile $DESTPATH` will do this for the
 standard Tectonic base bundle, `tlextras`. It does so using the helper
-`./staging.sh make-installation`.
+`./bundler.sh make-installation`.
 
 
 ## Creating the “indexed tar” bundle
 
-For bundles to be hosted on the web, the operation `./staging.sh zip2itar` will
+For bundles to be hosted on the web, the operation `./bundler.sh zip2itar` will
 convert the resulting Zip file to the “indexed tar” format used for Web-based
 bundles. **TODO**: this is not adequately documented at all.
 

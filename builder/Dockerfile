@@ -1,7 +1,7 @@
 # Copyright 2016-2017 the Tectonic Project.
 # Licensed under the MIT License.
 #
-# See ../staging.sh for a simple build recipe.
+# See ../bundler.sh for a simple build recipe.
 
 FROM debian:9
 MAINTAINER Peter Williams <peter@newton.cx>
