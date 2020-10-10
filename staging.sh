@@ -1,11 +1,8 @@
 #! /bin/bash
-# Copyright 2016 the Tectonic Project.
+# Copyright 2016-2020 the Tectonic Project.
 # Licensed under the MIT License.
 
-# NOTE: edit this file on the `vendor` branch and merge into `master`! We need
-# to have it on `vendor` to manage our various source-staging operations.
-
-image_name=tectonic-texlive-builder
+image_name=tectonic-texlive-bundler
 builder_cont_name=tectonic-bld-cont
 state_dir=$(pwd)/state # symlink here!
 
@@ -14,17 +11,13 @@ set -e
 if [ -z "$1" -o "$1" = help ] ; then
     echo "You must supply a subcommand. Subcommands are:
 
-bintray-upload    -- Upload an indexed tar file to Bintray.
 build-image       -- Create/update to builder Docker image.
 builder-bash      -- Run a shell in a temporary builder container.
-ingest-source     -- Copy needed source code from TeXLive to this repo.
 init-build        -- Initialize a Docker-based compilation of the TeXLive binaries.
 make-installation -- Install TeXLive into a new directory tree.
 make-base-zipfile -- Make a Zip file of a standardized base TeXLive installation.
-make-book         -- Compile the XeTeX referenece manual PDF (\"XeTeX: The Program\").
 run-build         -- Launch a Docker-based compilation of the TeXLive binaries.
 update-containers -- Rebuild the TeXLive \"container\" files.
-update-products   -- Update the prettified C code in \"products/\".
 zip2itar          -- Convert a bundle from Zip format to indexed-tar format.
 
 "
@@ -41,24 +34,6 @@ function die () {
 }
 
 
-function bintray_upload () {
-    tar_path="$1"
-    version="$2"
-    package_id="tl2016extras"
-
-    [ x"$2" != x ] || die "usage: staging.sh bintray-upload <tar-path> <version>"
-    [ x"$BINTRAY_API_KEY" != x ] || die "you must set the \$BINTRAY_API_KEY environment variable"
-
-    curl -T $tar_path.index.gz -u"pkgw:$BINTRAY_API_KEY" \
-         -H "X-Bintray-Package:$package_id" -H "X-Bintray-Version:$version" \
-         https://api.bintray.com/content/pkgw/tectonic/$package_id/$version/$(basename $tar_path).index.gz
-
-    curl -T $tar_path -u"pkgw:$BINTRAY_API_KEY" \
-         -H "X-Bintray-Package:$package_id" -H "X-Bintray-Version:$version" \
-         https://api.bintray.com/content/pkgw/tectonic/$package_id/$version/$(basename $tar_path)
-}
-
-
 function build_image () {
     tag=$(date +%Y%m%d)
     docker build -t $image_name:$tag builder/
@@ -69,12 +44,6 @@ function build_image () {
 function builder_bash () {
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
     exec docker run -it --rm -v $state_dir:/state:rw,z $image_name bash
-}
-
-
-function ingest_source () {
-    [ -d $state_dir/rbuild ] || die "no such directory $state_dir/rbuild"
-    exec ./ingest-source.sh
 }
 
 
@@ -204,18 +173,6 @@ function make_base_zipfile () {
 }
 
 
-function make_book () {
-    # We implement this here just to make this feature a bit more discoverable
-    # (i.e. if you just run `./staging.sh` and don't read the README.)
-
-    [ -f $state_dir/sbuild/merged.tex ] || \
-        die "you need to build the reference files with \`ninja\` - no such file $state_dir/sbuild/merged.tex"
-
-    set -x
-    exec tectonic --format=plain $state_dir/sbuild/merged.tex
-}
-
-
 function run_build() {
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
     [ -d $state_dir/rbuild ] || die "no such directory $state_dir/rbuild"
@@ -259,16 +216,6 @@ function update_containers () {
 }
 
 
-function update_products () {
-    [ -d $state_dir/sbuild ] || die "no such directory $state_dir/sbuild"
-    for f in xetex-pool.c xetexini.c xetex0.c xetexcoerce.h xetexd.h bibtex.c bibtex.h ; do
-	cp $state_dir/sbuild/$f products/
-	indent -linux -nut -i4 -l120 products/$f
-	rm -f products/${f}~
-    done
-}
-
-
 function zip2itar () {
     zipfile="$1"
 
@@ -288,31 +235,23 @@ function zip2itar () {
 # Dispatch subcommands.
 
 case "$command" in
-    bintray-upload)
-	bintray_upload "$@" ;;
     build-image)
-	build_image "$@" ;;
+        build_image "$@" ;;
     builder-bash)
-	builder_bash "$@" ;;
-    ingest-source)
-	ingest_source "$@" ;;
+        builder_bash "$@" ;;
     init-build)
-	init_build "$@" ;;
+        init_build "$@" ;;
     make-installation)
-	make_installation "$@" ;;
+        make_installation "$@" ;;
     make-base-zipfile)
-	make_base_zipfile "$@" ;;
-    make-book)
-	make_book "$@" ;;
+        make_base_zipfile "$@" ;;
     run-build)
-	run_build "$@" ;;
+        run_build "$@" ;;
     update-containers)
-	update_containers "$@" ;;
-    update-products)
-	update_products "$@" ;;
+        update_containers "$@" ;;
     zip2itar)
         zip2itar "$@" ;;
     *)
-	echo >&2 "error: unrecognized command \"$command\"."
-	exit 1 ;;
+        echo >&2 "error: unrecognized command \"$command\"."
+        exit 1 ;;
 esac
