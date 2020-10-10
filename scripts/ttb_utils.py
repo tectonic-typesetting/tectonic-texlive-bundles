@@ -137,8 +137,7 @@ class ZipMaker(object):
     def add_file(self, full_path):
         base = os.path.basename(full_path)
 
-        # Even if the basename has already been seen, we want to read in the
-        # file to compare digests.
+        # Get the digest
 
         with open(full_path, 'rb') as f:
             contents = f.read()
@@ -147,21 +146,22 @@ class ZipMaker(object):
         s.update(contents)
         digest = s.digest()
 
-        prev = self.item_shas.get(base)
+        # OK, have we seen this before?
 
-        if prev is None:
+        prev_tuple = self.item_shas.get(base)
+
+        if prev_tuple is None:
             # New basename, yay
             self.zip.writestr(base, contents)
-            self.item_shas[base] = digest
-        elif prev != digest:
+            self.item_shas[base] = (digest, full_path)
+        elif prev_tuple[0] != digest:
             # Already seen basename, and new contents :-(
             bydigest = self.clashes.setdefault(base, {})
 
             if not len(bydigest):
-                # If this is the first duplicate, we should mark that we've seen
-                # the file at least once before. We don't know the full path
-                # where it came from, but we have the digest.
-                bydigest[prev] = ['(elsewhere)']
+                # If this is the first duplicate, don't forget that we've seen
+                # the file at least once before.
+                bydigest[prev_tuple[0]] = [prev_tuple[1]]
 
             pathlist = bydigest.setdefault(digest, [])
             pathlist.append(full_path)
@@ -215,7 +215,7 @@ class ZipMaker(object):
         p = os.path.join(install_dir, 'texmf-dist')
         n = len(p) + 1
 
-        for dirpath, dirnames, filenames in os.walk(p, onerror=self._walk_onerr):
+        for dirpath, _, filenames in os.walk(p, onerror=self._walk_onerr):
             for fn in filenames:
                 full = os.path.join(dirpath, fn)
                 tex = full[n:]
@@ -230,7 +230,7 @@ class ZipMaker(object):
         for name in sorted(self.item_shas.keys()):
             s.update(name.encode('utf8'))
             s.update(b'\0')
-            s.update(self.item_shas[name])
+            s.update(self.item_shas[name][0])
 
         self.final_hexdigest = s.hexdigest()
         self.zip.writestr('SHA256SUM', self.final_hexdigest)
@@ -246,7 +246,7 @@ class ZipMaker(object):
                 bydigest = self.clashes[base]
 
                 for digest in sorted(bydigest.keys()):
-                    print(f'    {digest.hex()}:', file=sys.stderr)
+                    print(f'    {digest.hex()[:8]}:', file=sys.stderr)
 
                     for full in sorted(bydigest[digest]):
                         print(f'       {full[n:]}', file=sys.stderr)
