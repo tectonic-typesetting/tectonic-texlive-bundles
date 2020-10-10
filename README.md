@@ -1,4 +1,4 @@
-# Tectonic Bundle Builder
+# Tectonic TeXLive Bundle Builder
 
 This repository contains scripts for building “bundles” for
 [Tectonic](https://tectonic-typesetting.github.io) based on [Norbert Preining’s
@@ -6,12 +6,12 @@ Git mirror](http://git.texlive.info/texlive/) of [the TeXLive Subversion
 repository](http://tug.org/svn/texlive/).
 
 *You do not need this repository to build Tectonic.* You only need these scripts
-if you want to make your own bundle of TeX files.
+if you want to make your own bundle of TeX files based on the TeXLive sources.
 
 
 ## Prerequisites
 
-To do this, you will need at a minimum:
+To use these tools, you will need:
 
 - An installation of [Docker](https://www.docker.com/).
 - A checkout of the Preining TeXLive Git repository
@@ -55,23 +55,46 @@ package. *Note that the results of this step will depend on what version of the
 TeXLive tree you currently have checked out in `state/repo`.*
 
 
-## Creating the Zip bundle
+## Creating a TeXLive installation tree
 
-Once you have created your TeXLive containers, the script
-`make-zipfile.py` can compile them into a single master Zip file. The
-operation `./driver.sh make-base-zipfile $DESTPATH` will do this for the
-standard Tectonic base bundle, `tlextras`. It does so using the helper
-`./driver.sh make-installation`.
+**NOTE: this workflow is still evolving!**.
 
+Run:
 
-## Creating the “indexed tar” bundle
-
-For bundles to be hosted on the web, the operation `./driver.sh zip2itar` will
-convert the resulting Zip file to the “indexed tar” format used for Web-based
-bundles. **TODO**: this is not adequately documented at all.
+```
+./driver.sh make-installation bundles/tlextras
+./driver.sh install-packages bundles/tlextras
+```
 
 
-# Copyright and Licensing
+## Exporting to a Zip-format bundle
+
+**NOTE: this workflow is still evolving!**.
+
+Run:
+
+```
+./driver.sh make-base-zipfile bundles/tlextras path/to/output.zip
+```
+
+A local copy of this bundle file can be used with the `tectonic` command-line
+program with the `-b` argument.
+
+
+## Converting to an “indexed tar” bundle
+
+**NOTE: this workflow is still evolving!**.
+
+This step is needed to create a bundle that will be hosted on the web. Run:
+
+```
+./driver.sh zip2itar path/to/output.zip
+```
+
+This will create `path/to/output.tar` and `path/to/output.tar.index.gz`.
+
+
+#### Copyright and Licensing
 
 The infrastructure scripts in this repository are licensed under the MIT
 License. Their copyright is assigned to the Tectonic Project.
