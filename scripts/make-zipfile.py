@@ -38,6 +38,8 @@ def entrypoint(argv):
             b = ZipMaker(bundle, zip)
             b.go()
             print(b.final_hexdigest)
+
+        chown_host(settings.dest_path, recursive=False)
     except Exception as e:
         try:
             os.unlink(settings.dest_path)

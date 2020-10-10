@@ -116,11 +116,6 @@ ignored_base_names = set([
     'ls-R',
 ])
 
-ignored_tex_paths = set([
-    'tex/generic/tex-ini-files/pdftexconfig.tex',
-    'tex/luatex/hyph-utf8/etex.src',
-])
-
 
 class ZipMaker(object):
     def __init__(self, bundle, zip):
@@ -129,6 +124,14 @@ class ZipMaker(object):
         self.item_shas = {}
         self.final_hexdigest = None
         self.clashes = {}  # basename => {digest => fullpath}
+
+        self.ignored_tex_paths = set()
+
+        with open(bundle.path('ignored-tex-paths.txt')) as f:
+            for line in f:
+                line = line.split('#')[0].strip()
+                if len(line):
+                    self.ignored_tex_paths.add(line)
 
 
     def add_file(self, full_path):
@@ -174,7 +177,7 @@ class ZipMaker(object):
         if base_name in ignored_base_names:
             return
 
-        if tex_path in ignored_tex_paths:
+        if tex_path in self.ignored_tex_paths:
             return
 
         if base_name.endswith('.log'):
