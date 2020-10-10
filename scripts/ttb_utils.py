@@ -120,6 +120,7 @@ IGNORED_EXTENSIONS = set([
     'fmt',
     'log',
     'lua',
+    'mf',
 ])
 
 
