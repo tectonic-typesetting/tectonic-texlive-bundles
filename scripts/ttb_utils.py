@@ -108,12 +108,18 @@ class Bundle(object):
             yield f.name
 
 
-ignored_base_names = set([
+IGNORED_BASE_NAMES = set([
     'LICENSE.md',
     'Makefile',
     'README',
     'README.md',
     'ls-R',
+])
+
+IGNORED_EXTENSIONS = set([
+    'fmt',
+    'log',
+    'lua',
 ])
 
 
@@ -174,16 +180,14 @@ class ZipMaker(object):
         to come out with a nice pretty tarball in the end.
         """
 
-        if base_name in ignored_base_names:
+        if base_name in IGNORED_BASE_NAMES:
+            return
+
+        ext_bits = base_name.split('.', 1)
+        if len(ext_bits) > 1 and ext_bits[1] in IGNORED_EXTENSIONS:
             return
 
         if tex_path in self.ignored_tex_paths:
-            return
-
-        if base_name.endswith('.log'):
-            return
-
-        if base_name.endswith('.fmt'):
             return
 
         self.add_file(full_path)
@@ -250,3 +254,5 @@ class ZipMaker(object):
 
                     for full in sorted(bydigest[digest]):
                         print(f'       {full[n:]}', file=sys.stderr)
+
+            print('', file=sys.stderr)
