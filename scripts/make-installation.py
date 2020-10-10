@@ -24,7 +24,7 @@ def make_arg_parser():
 def entrypoint(argv):
     settings = make_arg_parser().parse_args(argv[1:])
     bundle = Bundle.open_default()
-    install_dir = bundle.install_dir()
+    install_dir = bundle.install_path()
 
     # Validate that our current repo and the containers are in sync
 

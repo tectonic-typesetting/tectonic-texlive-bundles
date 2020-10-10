@@ -25,7 +25,7 @@ def make_arg_parser():
 def entrypoint(argv):
     settings = make_arg_parser().parse_args(argv[1:])
     bundle = Bundle.open_default()
-    install_dir = bundle.install_dir()
+    install_dir = bundle.install_path()
 
     with open(bundle.path('packages.txt')) as f:
         packages = [l.strip() for l in f]

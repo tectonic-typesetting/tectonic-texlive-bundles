@@ -132,13 +132,17 @@ class Bundle(object):
         return os.path.join('/bundle', *segments)
 
 
-    def install_dir(self):
-        return os.path.join('/state/installs', f'{self.name}-{self.version}')
+    def install_path(self, *segments):
+        return os.path.join('/state/installs', f'{self.name}-{self.version}', *segments)
+
+
+    def artifact_path(self, *segments0:)
+        return os.path.join('/state/artifacts', f'{self.name}-{self.version}', *segments)
 
 
     @contextlib.contextmanager
     def create_texlive_profile(self):
-        dest = self.install_dir()
+        dest = self.install_path()
 
         with tempfile.NamedTemporaryFile(delete=False, mode='wt') as f:
             with open(self.path('tl-profile.txt'), 'rt') as template:
@@ -254,7 +258,7 @@ class ZipMaker(object):
 
 
     def go(self):
-        install_dir = self.bundle.install_dir()
+        install_dir = self.bundle.install_path()
 
         # Add a couple of version files from the builder.
 
