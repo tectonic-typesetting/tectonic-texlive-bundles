@@ -13,10 +13,8 @@ if [ -z "$1" -o "$1" = help ] ; then
 
 build-image       -- Create or update the bundler Docker image.
 bundler-bash      -- Run a shell in a temporary bundler container.
-init-build        -- Initialize a Docker-based compilation of the TeXLive binaries.
 make-installation -- Install TeXLive into a new directory tree.
 make-base-zipfile -- Make a Zip file of a standardized base TeXLive installation.
-run-build         -- Launch a Docker-based compilation of the TeXLive binaries.
 update-containers -- Rebuild the TeXLive \"container\" files.
 zip2itar          -- Convert a bundle from Zip format to indexed-tar format.
 
@@ -44,19 +42,6 @@ function build_image () {
 function bundler_bash () {
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
     exec docker run -it --rm -v $state_dir:/state:rw,z $image_name bash
-}
-
-
-function init_build() {
-    [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
-    [ ! -d $state_dir/rbuild ] || die "directory $state_dir/rbuild may not exist before starting build"
-    docker create \
-           -v $state_dir:/state:rw,z \
-           -i -t \
-           --name $bundler_cont_name \
-           $image_name bash || die "could not create bundler container $bundler_cont_name"
-    docker start $bundler_cont_name || die "could not start bundler container $bundler_cont_name"
-    exec docker exec $bundler_cont_name /entrypoint.sh init-build
 }
 
 
@@ -173,16 +158,6 @@ function make_base_zipfile () {
 }
 
 
-function run_build() {
-    [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
-    [ -d $state_dir/rbuild ] || die "no such directory $state_dir/rbuild"
-    docker start $bundler_cont_name || die "could not start bundler container $bundler_cont_name"
-    echo "Building with logs to state/rbuild.log ..."
-    docker exec $bundler_cont_name /entrypoint.sh bash -c 'cd /state/rbuild && make' &> state/rbuild.log \
-           || die "build exited with an error code! consult the log file"
-}
-
-
 function update_containers () {
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
     mkdir -p $state_dir/containers $state_dir/versioned
@@ -239,14 +214,10 @@ case "$command" in
         build_image "$@" ;;
     bundler-bash)
         bundler_bash "$@" ;;
-    init-build)
-        init_build "$@" ;;
     make-installation)
         make_installation "$@" ;;
     make-base-zipfile)
         make_base_zipfile "$@" ;;
-    run-build)
-        run_build "$@" ;;
     update-containers)
         update_containers "$@" ;;
     zip2itar)
