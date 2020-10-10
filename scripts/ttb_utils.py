@@ -226,6 +226,13 @@ class ZipMaker(object):
         else:
             warn(f'expected but did not see the file `{p}`')
 
+        # Add the extra files preloaded in the bundle
+
+        extras_dir = self.bundle.path('extras')
+
+        for name in os.listdir(extras_dir):
+            self.add_file(os.path.join(extras_dir, name))
+
         # Add the main tree.
 
         p = os.path.join(install_dir, 'texmf-dist')

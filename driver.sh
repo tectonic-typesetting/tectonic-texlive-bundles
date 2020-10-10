@@ -115,8 +115,6 @@ function make_base_zipfile () {
 
     use_bundle "$bundle_dir"
 
-    echo XXX TODO COPY IN EXTRAS
-
     exec docker run -it --rm "${docker_args[@]}" $image_name \
         python /source/scripts/make-zipfile.py "$zip" "$@"
 }
