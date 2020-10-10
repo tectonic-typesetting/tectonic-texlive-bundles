@@ -24,7 +24,7 @@ Data files associated with the staging process will land in other subdirectories
 of `state/`.
 
 
-## Getting started: creating the builder image
+## Getting started: creating the bundler image
 
 The first step is to create a Docker container that will host most of the
 computations — this promotes reproducibility and portability, regardless of what
@@ -49,7 +49,7 @@ TeXLive checkout, run:
 ./bundler.sh update-containers
 ```
 
-This will use a Docker builder container to generate TeXLive container files in
+This will use the Docker container to generate TeXLive container files in
 `state/containers`. The script will furthermore copy those files to
 `state/versioned`, altering the names to record the exact version of each
 package. *Note that the results of this step will depend on what version of the
@@ -59,7 +59,7 @@ TeXLive tree you currently have checked out in `state/repo`.*
 ## Creating the Zip bundle
 
 Once you have created your TeXLive containers, the script
-`builder/make-zipfile.py` can compile them into a single master Zip file. The
+`make-zipfile.py` can compile them into a single master Zip file. The
 operation `./bundler.sh make-base-zipfile $DESTPATH` will do this for the
 standard Tectonic base bundle, `tlextras`. It does so using the helper
 `./bundler.sh make-installation`.

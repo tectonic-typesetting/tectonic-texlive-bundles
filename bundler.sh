@@ -3,7 +3,7 @@
 # Licensed under the MIT License.
 
 image_name=tectonic-texlive-bundler
-builder_cont_name=tectonic-bld-cont
+bundler_cont_name=tectonic-bld-cont
 state_dir=$(pwd)/state # symlink here!
 
 set -e
@@ -11,8 +11,8 @@ set -e
 if [ -z "$1" -o "$1" = help ] ; then
     echo "You must supply a subcommand. Subcommands are:
 
-build-image       -- Create/update to builder Docker image.
-builder-bash      -- Run a shell in a temporary builder container.
+build-image       -- Create or update the bundler Docker image.
+bundler-bash      -- Run a shell in a temporary bundler container.
 init-build        -- Initialize a Docker-based compilation of the TeXLive binaries.
 make-installation -- Install TeXLive into a new directory tree.
 make-base-zipfile -- Make a Zip file of a standardized base TeXLive installation.
@@ -36,12 +36,12 @@ function die () {
 
 function build_image () {
     tag=$(date +%Y%m%d)
-    docker build -t $image_name:$tag builder/
+    docker build -t $image_name:$tag bundler/
     docker tag $image_name:$tag $image_name:latest
 }
 
 
-function builder_bash () {
+function bundler_bash () {
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
     exec docker run -it --rm -v $state_dir:/state:rw,z $image_name bash
 }
@@ -53,10 +53,10 @@ function init_build() {
     docker create \
            -v $state_dir:/state:rw,z \
            -i -t \
-           --name $builder_cont_name \
-           $image_name bash || die "could not create builder container $builder_cont_name"
-    docker start $builder_cont_name || die "could not start builder container $builder_cont_name"
-    exec docker exec $builder_cont_name /entrypoint.sh init-build
+           --name $bundler_cont_name \
+           $image_name bash || die "could not create bundler container $bundler_cont_name"
+    docker start $bundler_cont_name || die "could not start bundler container $bundler_cont_name"
+    exec docker exec $bundler_cont_name /entrypoint.sh init-build
 }
 
 
@@ -77,7 +77,7 @@ function make_installation () {
     # option_sys_* are not created either.
     # Other settings are best guesses about what's sensible.
 
-    cat >$dest/builder.profile <<-EOF
+    cat >$dest/bundler.profile <<-EOF
     selected_scheme scheme-minimal
     TEXDIR $cdest
     TEXMFSYSCONFIG $cdest/texmf-dist
@@ -108,7 +108,7 @@ EOF
     echo >&2 "Logging installation to $dest/outer.log ..."
     set +e
     docker run --rm -v $state_dir:/state:rw,z $image_name \
-	   install-profile $cdest/builder.profile $cdest $(id -u):$(id -g) "$@" &>$dest/outer.log
+	   install-profile $cdest/bundler.profile $cdest $(id -u):$(id -g) "$@" &>$dest/outer.log
     ec=$?
     [ $ec -eq 0 ] || die "install-tl failed; see $dest/outer.log"
     set -e
@@ -168,7 +168,7 @@ function make_base_zipfile () {
 
     # Finally, turn it all into a Zip file.
 
-    ./builder/make-zipfile.py "$installdir" "$zip"
+    ./bundler/make-zipfile.py "$installdir" "$zip"
     rm -rf "$installdir"
 }
 
@@ -176,9 +176,9 @@ function make_base_zipfile () {
 function run_build() {
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
     [ -d $state_dir/rbuild ] || die "no such directory $state_dir/rbuild"
-    docker start $builder_cont_name || die "could not start builder container $builder_cont_name"
+    docker start $bundler_cont_name || die "could not start bundler container $bundler_cont_name"
     echo "Building with logs to state/rbuild.log ..."
-    docker exec $builder_cont_name /entrypoint.sh bash -c 'cd /state/rbuild && make' &> state/rbuild.log \
+    docker exec $bundler_cont_name /entrypoint.sh bash -c 'cd /state/rbuild && make' &> state/rbuild.log \
            || die "build exited with an error code! consult the log file"
 }
 
@@ -237,8 +237,8 @@ function zip2itar () {
 case "$command" in
     build-image)
         build_image "$@" ;;
-    builder-bash)
-        builder_bash "$@" ;;
+    bundler-bash)
+        bundler_bash "$@" ;;
     init-build)
         init_build "$@" ;;
     make-installation)
