@@ -7,6 +7,12 @@ bundler_cont_name=tectonic-bld-cont
 source_dir="$(cd $(dirname "$0") && pwd)"
 state_dir=$(pwd)/state # symlink here!
 
+docker_args=(
+    -e HOSTUID=$(id -u)
+    -e HOSTGID=$(id -u)
+    -v "$source_dir":/source:ro,z
+)
+
 set -e
 
 if [ -z "$1" -o "$1" = help ] ; then
@@ -42,7 +48,7 @@ function build_image () {
 
 function bundler_bash () {
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
-    exec docker run -it --rm -v $source_dir:/source:ro,z -v $state_dir:/state:rw,z $image_name bash
+    exec docker run -it --rm "${docker_args[@]}" -v $state_dir:/state:rw,z $image_name bash
 }
 
 
@@ -50,7 +56,7 @@ function make_installation () {
     bundle_dir="$1"
     shift
 
-    if [ ! -f "$bundle_dir/bundle.cfg" ] ; then
+    if [ ! -f "$bundle_dir/bundle.toml" ] ; then
         die "usage: $0 make-installation <bundle-dir> [...]"
     fi
 
@@ -58,7 +64,7 @@ function make_installation () {
 
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
 
-    exec docker run -it --rm -v $source_dir:/source:ro,z -v $state_dir:/state:rw,z -v $bundle_dir:/bundle:rw,z $image_name \
+    exec docker run -it --rm "${docker_args[@]}" -v $state_dir:/state:rw,z -v $bundle_dir:/bundle:rw,z $image_name \
         python /source/scripts/make-installation.py "$@"
 }
 

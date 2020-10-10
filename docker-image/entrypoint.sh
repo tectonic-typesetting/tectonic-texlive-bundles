@@ -11,7 +11,6 @@ if [ -z "$1" -o "$1" = help ] ; then
     echo "You must supply a subcommand to run in the container. Commands are:
 
 bash              -- Run a bash shell
-install-profile   -- Create an installation based on a TeXLive \"profile\" template.
 python            -- Run a Python script
 update-containers -- Rebuild the TeXLive \"container\" files
 
@@ -47,46 +46,6 @@ function _precise_version () {
     git show -s |grep git-svn-id |sed -e 's/.*@//' -e 's/ .*//' >"$destdir/SVNREV"
 }
 
-
-function install_profile () {
-    profile_template="$1"
-    shift
-    install_dest="$1"
-    shift
-    chown_spec="$1"
-    shift
-
-    profile="$(mktemp)"
-    sed -e "s|@dest@|$install_dest|g" <"$profile_template" >"$profile"
-
-    cd /state/repo/
-    _precise_version "$install_dest"
-    Master/install-tl --repository /state/containers --profile "$profile"
-    chown -R "$chown_spec" "$install_dest"
-}
-
-
-function OLD_install_profile () {
-    profile="$1"
-    shift
-    install_dest="$1"
-    shift
-    chown_spec="$1"
-    shift
-
-    cd /state/repo/
-    _precise_version "$install_dest"
-    Master/install-tl --repository /state/containers --profile "$profile"
-
-    if [ $# -gt 0 ] ; then
-        cd "$install_dest"
-        # NOTE: leading "./" is essential!
-        ./bin/*/tlmgr --repository /state/containers install "$@"
-    fi
-
-    chown -R "$chown_spec" "$install_dest"
-}
-
 function update_containers () {
     cd /state/repo/
     _precise_version /state/containers
@@ -106,8 +65,6 @@ if [ "$command" = bash ] ; then
     exec bash "$@"
 elif [ "$command" = python ] ; then
     exec python3 "$@"
-elif [ "$command" = install-profile ] ; then
-    install_profile "$@"
 elif [ "$command" = update-containers ] ; then
     update_containers "$@"
 else
