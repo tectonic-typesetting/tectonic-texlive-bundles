@@ -17,15 +17,18 @@ docker_args=(
 set -e
 
 if [ -z "$1" -o "$1" = help ] ; then
-    echo "You must supply a subcommand. Subcommands are:
+    echo "You must supply a subcommand. Main subcommands are (in usual workflow order):
 
-build-image       -- Create or update the bundler Docker image.
-bundler-bash      -- Run a shell in a temporary bundler container.
-make-installation -- Install TeXLive into a new directory tree.
-make-itar         -- Convert a bundle from Zip format to indexed-tar format.
-make-zipfile      -- Make a Zip file from a TeXLive installation tree.
-update-containers -- Rebuild the TeXLive \"container\" files.
+  build-image       -- Create or update the bundler Docker image.
+  update-containers -- (Re)build the TeXLive \"container\" files.
+  make-installation -- Install TeXLive into a new directory tree.
+  install-packages  -- Add packages to a TeXLive installation tree.
+  make-zipfile      -- Make a Zip file from a TeXLive installation tree.
+  make-itar         -- Convert a bundle from Zip format to indexed-tar format.
 
+Also:
+
+  bundler-bash      -- Run a shell in a temporary bundler container.
 "
     exit 1
 fi
@@ -38,6 +41,10 @@ function die () {
     echo >&2 "error:" "$@"
     exit 1
 }
+
+if [ ! -d $state_dir ] ; then
+    die "you must create or symlink a \"state\" directory at the path \"$state_dir\""
+fi
 
 function require_repo() {
     [ -d $state_dir/repo ] || die "no such directory $state_dir/repo"
