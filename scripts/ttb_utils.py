@@ -159,6 +159,7 @@ class Bundle(object):
     def ensure_artfact_dir(self):
         path = self.artifact_path()
         os.makedirs(path, exist_ok=True)
+        chown_host('/state/artifacts', recursive=False)
         chown_host(path)
 
 
