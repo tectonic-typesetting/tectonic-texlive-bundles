@@ -16,13 +16,14 @@ from test_utils import *
 
 # We use percent formatting since all the TeX braces would be super annoying to
 # escape in str.format() formatting.
-CLASS_TEMPLATE = r'''\documentclass{%(class)s}
-\title{Test Title}
-\author{An Author}
-\begin{document}
+DOC_CLASS_TEMPLATE = r'\documentclass{%(class)s}'
+
+TITLE_AUTHOR = r'''\title{Test Title}
+\author{An Author}'''
+
+DOCUMENT_BODY = r'''\begin{document}
 Hello, world.
-\end{document}
-'''
+\end{document}'''
 
 
 def entrypoint(argv):
@@ -87,7 +88,12 @@ def entrypoint(argv):
         }
 
         with open(texpath, 'wt') as f:
-            print(CLASS_TEMPLATE % params, file=f)
+            print(DOC_CLASS_TEMPLATE % params, file=f)
+
+            if 'titleauth' in flags:
+                print(TITLE_AUTHOR, file=f)
+
+            print(DOCUMENT_BODY, file=f)
 
         with open(os.path.join(thisdir, 'log.txt'), 'wb') as log:
             result = subprocess.call(
@@ -99,11 +105,11 @@ def entrypoint(argv):
 
         if result == 0:
             if 'ok' in flags:
-                print('ok')
+                print('pass')
             else:
                 # This test succeeded even though we didn't expect it to.
                 # Not a bad thing, but worth noting!
-                print('ok (unexpected)')
+                print('pass (unexpected)')
                 n_surprises += 1
         else:
             if 'xfail' in flags:
@@ -123,9 +129,9 @@ def entrypoint(argv):
     if n_surprises:
         print(f'- {n_surprises} surprise passes')
     if n_errors:
-        print(f'- {n_errors} total errors')
+        print(f'- {n_errors} total errors: test failed')
     else:
-        print('- no errors')
+        print('- no errors: test passed')
 
     return 1 if n_errors else 0
 
