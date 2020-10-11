@@ -24,7 +24,7 @@ warn
 import os.path
 import sys
 
-import pytoml
+import toml
 
 
 def warn(text):
@@ -47,7 +47,7 @@ class Bundle(object):
         self.basedir = basedir
 
         with open(self.path('bundle.toml'), 'rt') as f:
-            cfg = pytoml.load(f)
+            cfg = toml.load(f)
 
         self.cfg = cfg
         self.name = cfg['bundle']['name']

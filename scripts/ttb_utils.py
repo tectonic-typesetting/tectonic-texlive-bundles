@@ -29,7 +29,7 @@ warn
 import contextlib
 import hashlib
 import os.path
-import pytoml
+import toml
 import struct
 import subprocess
 import sys
@@ -119,7 +119,7 @@ class Bundle(object):
         inst = cls()
 
         with open('/bundle/bundle.toml', 'rt') as f:
-            cfg = pytoml.load(f)
+            cfg = toml.load(f)
 
         inst.cfg = cfg
         inst.name = cfg['bundle']['name']

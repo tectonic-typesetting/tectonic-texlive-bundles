@@ -9,7 +9,7 @@ libdigest-perl-md5-perl
 libfontconfig1
 git-core
 python3
-python3-pytoml
+python3-toml
 wget
 "
 
