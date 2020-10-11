@@ -18,6 +18,8 @@ To use these tools, you will need:
   (`git://git.texlive.info/texlive.git`), placed or symlinked in a subdirectory
   named `state/repo` below this file. Be aware that this repository currently
   weighs in at **40 gigabytes**!
+- A Rust toolchain if you want to create “indexed tar” bundles. (So, you don’t
+  need Rust if you want to create a bundle and test it locally.)
 
 Data files associated with the staging process will land in other subdirectories
 of `state/`.
@@ -55,7 +57,7 @@ TeXLive tree you currently have checked out in `state/repo`.*
 
 ## Creating a TeXLive installation tree
 
-**NOTE: this workflow is still evolving!**.
+**NOTE: this workflow is still evolving!**
 
 Run:
 
@@ -64,10 +66,14 @@ Run:
 ./driver.sh install-packages bundles/tlextras
 ```
 
+(In the future, we might add more specifications to the `bundles` directory for
+creating specialized bundles. The `tlextras` bundle is the one-size-fits-all
+default bundle.)
+
 
 ## Exporting to a Zip-format bundle
 
-**NOTE: this workflow is still evolving!**.
+**NOTE: this workflow is still evolving!**
 
 Run:
 
@@ -75,13 +81,14 @@ Run:
 ./driver.sh make-zipfile bundles/tlextras
 ```
 
-A local copy of this bundle file can be used with the `tectonic` command-line
-program with the `-b` argument.
+This will create a large Zip-format bundle file with a name something like
+`state/artifacts/tlextras-2020.0r0/tlextras-2020.0r0.zip`. Such a bundle file
+can be used with the `tectonic` command-line program with the `-b` argument.
 
 
 ## Converting to an “indexed tar” bundle
 
-**NOTE: this workflow is still evolving!**.
+**NOTE: this workflow is still evolving!**
 
 This step is needed to create a bundle that will be hosted on the web. Run:
 
