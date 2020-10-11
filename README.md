@@ -111,6 +111,7 @@ interpreter and the [toml] package.
 Test scripts are located in the `tests` directory. Currently available:
 
 - `tests/classes.py`: basic compilation smoketest of the documentclasses in a bundle
+- `tests/formats.py`: test generation of the format files defined in the bundle
 
 
 #### Copyright and Licensing
