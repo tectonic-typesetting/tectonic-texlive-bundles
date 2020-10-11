@@ -36,6 +36,7 @@ def entrypoint(argv):
     n_tested = 0
     n_missing = 0
     n_removed = 0
+    n_xfail = 0
 
     # Load the classes from the bundle
 
@@ -114,6 +115,7 @@ def entrypoint(argv):
         else:
             if 'xfail' in flags:
                 print('xfail')
+                n_xfail += 1
             else:
                 # This test failed unexpectedly :-(
                 print('FAIL')
@@ -126,6 +128,8 @@ def entrypoint(argv):
         print(f'- {n_missing} documentclasses missing from classes.txt')
     if n_removed:
         print(f'- {n_removed} documentclasses in classes.txt removed from bundle')
+    if n_xfail:
+        print(f'- {n_xfail} expected failures')
     if n_surprises:
         print(f'- {n_surprises} surprise passes')
     if n_errors:
