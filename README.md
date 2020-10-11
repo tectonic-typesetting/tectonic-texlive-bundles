@@ -49,9 +49,7 @@ TeXLive checkout, run:
 ```
 
 This will use the Docker container to generate TeXLive container files in
-`state/containers`. The script will furthermore copy those files to
-`state/versioned`, altering the names to record the exact version of each
-package. *Note that the results of this step will depend on what version of the
+`state/containers`. *The results of this step will depend on what version of the
 TeXLive tree you currently have checked out in `state/repo`.*
 
 
