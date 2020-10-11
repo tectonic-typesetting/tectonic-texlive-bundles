@@ -95,6 +95,19 @@ This will create both the `.tar` and the `.tar.index.gz` files that need to be
 uploaded for use as a web bundle.
 
 
+## Testing
+
+Bundle definitions come with testing information. To test a bundle, you need the
+`tectonic` command-line program to be in your $PATH, as well as a Python 3
+interpreter and the [toml] package.
+
+[toml]: https://pypi.org/project/toml/
+
+Test scripts are located in the `tests` directory. Currently available:
+
+- `tests/classes.py`: basic compilation smoketest of the documentclasses in a bundle
+
+
 #### Copyright and Licensing
 
 The infrastructure scripts in this repository are licensed under the MIT
