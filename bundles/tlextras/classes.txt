@@ -98,7 +98,7 @@ chemmacros-manual xfail
 chletter ok
 cje xfail
 cnbwp xfail
-cnltx-doc xfail
+cnltx-doc ok
 codedoc ok
 combine ok
 ConcProg ok
@@ -275,7 +275,7 @@ ksp-thesis xfail
 l3doc ok
 labbook ok
 langscibook xfail
-leadsheet xfail
+leadsheet ok
 leaflet ok
 lectures xfail
 legislation xfail
@@ -352,7 +352,7 @@ novel xfail
 nrc1 xfail
 nrc2 xfail
 nwejm xfail
-nwejmart xfail
+nwejmart ok
 oblivoir ok
 oblivoir-utf xfail
 oblivoir-xl xfail
@@ -415,12 +415,12 @@ schuleub xfail
 schuleue ok
 schullsg ok
 schullzk ok
-schulma-ab xfail
+schulma-ab ok
 schulma-gutachten ok
 schulma-klausur xfail
-schulma-komp xfail
-schulma-mdlprf xfail
-schulma-praes xfail
+schulma-komp ok
+schulma-mdlprf ok
+schulma-praes ok
 sciposter ok
 scrartcl ok
 scrarticle ok
@@ -532,9 +532,9 @@ umthesis ok
 unam-thesis xfail
 unifith ok
 unitn-bimrep xfail
-univie-ling-expose xfail
-univie-ling-paper xfail
-univie-ling-thesis xfail
+univie-ling-expose ok
+univie-ling-paper ok
+univie-ling-thesis ok
 univie-ling-wlg xfail
 unizgklasa ok
 uothesis ok
