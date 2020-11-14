@@ -112,6 +112,10 @@ Test scripts are located in the `tests` directory. Currently available:
 
 - `tests/classes.py`: basic compilation smoketest of the documentclasses in a bundle
 - `tests/formats.py`: test generation of the format files defined in the bundle
+- `tests/packages.py`: test loading if the package (style) files defined in the
+  bundle. There are thousands of style files in a typical bundle, so this
+  program uses a framework to run a random-but-reproducible subset of the tests.
+  See the header comment in the Python file for more information.
 
 
 #### Copyright and Licensing
