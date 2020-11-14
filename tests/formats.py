@@ -77,7 +77,7 @@ def entrypoint(argv):
             with open(os.path.join(thisdir, 'log.txt'), 'wb') as log:
                 result = subprocess.call(
                     [
-                        'tectonic',
+                        TECTONIC_PROGRAM,
                         '-p',
                         '-b', bundle.zip_path(),
                         '--outfmt', 'fmt',

@@ -191,6 +191,8 @@ IGNORED_EXTENSIONS = set([
     'log',
     'lua',
     'mf',
+    'pl',
+    'ps',
 ])
 
 

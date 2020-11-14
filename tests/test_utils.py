@@ -16,6 +16,7 @@ gross.
 """
 
 __all__ = '''
+TECTONIC_PROGRAM
 Bundle
 die
 warn
@@ -25,6 +26,9 @@ import os.path
 import sys
 
 import toml
+
+
+TECTONIC_PROGRAM = os.environ.get('TECTONIC', 'tectonic')
 
 
 def warn(text):
