@@ -27,7 +27,7 @@ def entrypoint(argv):
     bundle = Bundle.open_default()
     install_dir = bundle.install_path()
 
-    with open(bundle.path('packages.txt')) as f:
+    with open(bundle.path('tlpackages.txt')) as f:
         packages = [l.strip() for l in f]
 
     # Validate that current repo, containers, and install are in sync
