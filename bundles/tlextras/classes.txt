@@ -554,7 +554,7 @@ uwmslide ok
 uwthesis ok
 verifica ok
 wallcalendar xfail
-webquiz xfail
+webquiz ok
 withargs-packagedoc xfail
 wkmgr ok
 worlddev ok
