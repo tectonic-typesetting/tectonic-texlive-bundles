@@ -51,7 +51,7 @@ function require_repo() {
 }
 
 function use_bundle() {
-    bundle_dir="$1"
+    local bundle_dir="$1"
     shift
 
     if [ ! -f "$bundle_dir/bundle.toml" ] ; then
@@ -67,7 +67,7 @@ function use_bundle() {
 # Subcommands (alphabetical order):
 
 function build_image () {
-    tag=$(date +%Y%m%d)
+    local tag=$(date +%Y%m%d)
     docker build -t $image_name:$tag docker-image/
     docker tag $image_name:$tag $image_name:latest
 }
@@ -79,31 +79,37 @@ function bundler_bash () {
 
 
 function install_packages () {
-    bundle_dir="$1"
+    local bundle_dir="$1"
     shift || die "usage: $0 install-packages <bundle-dir>"
 
     use_bundle "$bundle_dir"
     require_repo
 
-    exec docker run -it --rm "${docker_args[@]}" $image_name \
+    docker run -it --rm "${docker_args[@]}" $image_name \
         python /source/scripts/install-packages.py "$@"
+
+    echo
+    echo "Next, you might want to run \`$0 make-zipfile $bundle_dir\`"
 }
 
 
 function make_installation () {
-    bundle_dir="$1"
+    local bundle_dir="$1"
     shift || die "usage: $0 make-installation <bundle-dir>"
 
     use_bundle "$bundle_dir"
     require_repo
 
-    exec docker run -it --rm "${docker_args[@]}" $image_name \
+    docker run -it --rm "${docker_args[@]}" $image_name \
         python /source/scripts/make-installation.py "$@"
+
+    echo
+    echo "Next, you might want to run \`$0 install-packages $bundle_dir\`"
 }
 
 
 function make_itar () {
-    bundle_dir="$1"
+    local bundle_dir="$1"
     shift || die "usage: $0 make-itar <bundle-dir>"
 
     use_bundle "$bundle_dir"
@@ -119,13 +125,16 @@ function make_itar () {
 
 
 function make_zipfile () {
-    bundle_dir="$1"
+    local bundle_dir="$1"
     shift || die "usage: $0 make-zipfile <bundle-dir>"
 
     use_bundle "$bundle_dir"
 
-    exec docker run -it --rm "${docker_args[@]}" $image_name \
+    docker run -it --rm "${docker_args[@]}" $image_name \
         python /source/scripts/make-zipfile.py "$@"
+
+    echo
+    echo "Now you can test your bundle with commands like \`$(dirname $0)/tests/formats.py $bundle_dir\`"
 }
 
 
