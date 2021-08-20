@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 # -*- mode: python; coding: utf-8 -*-
-# Copyright 2020 the Tectonic Project.
+# Copyright 2020-2021 the Tectonic Project.
 # Licensed under the MIT License.
 
 """
@@ -64,8 +64,12 @@ def entrypoint(argv):
     if settings.sample_key is None:
         settings.sample_key = random.randint(0, 99)
 
-    print(f'note: sampling {settings.sample_percentage}% of the randomized test cases')
-    print(f'note: sample key is {settings.sample_key}; use argument `-K {settings.sample_key}` to reproduce this run`')
+    if settings.bootstrap:
+        print('note: bootstrap mode engaged! Testing *all* packages and rewriting packages.txt')
+        print()
+    else:
+        print(f'note: sampling {settings.sample_percentage}% of the randomized test cases')
+        print(f'note: sample key is {settings.sample_key}; use argument `-K {settings.sample_key}` to reproduce this run`')
 
     # Load the packages from the bundle
 
@@ -77,46 +81,66 @@ def entrypoint(argv):
             if base.endswith('.sty'):
                 bundle_packages.add(base[:-4])
 
-    # Compare to the test reference data
+    # Compare to the test reference data, if we're not in bootstrap mode:
 
     ref_packages = {}
 
-    with open(bundle.path('packages.txt')) as fref:
-        for line in fref:
-            bits = line.split()
-            classname = bits[0]
-            info = {}
+    if settings.bootstrap:
+        for pkg in bundle_packages:
+            ref_packages[pkg] = {
+                'tags': ['ok'],
+                'randkey': random.randint(0, 99),
+            }
+    else:
+        with open(bundle.path('packages.txt')) as fref:
+            for line in fref:
+                bits = line.split()
+                classname = bits[0]
+                info = {}
 
-            info['tags'] = bits[1].split(',')
+                info['tags'] = bits[1].split(',')
 
-            for bit in bits[2:]:
-                if bit.startswith('rand='):
-                    info['randkey'] = int(bit[5:])
-                else:
-                    die(f'unexpected metadata item {bit!r} in packages.txt')
+                for bit in bits[2:]:
+                    if bit.startswith('rand='):
+                        info['randkey'] = int(bit[5:])
+                    else:
+                        die(f'unexpected metadata item {bit!r} in packages.txt')
 
-            ref_packages[classname] = info
+                ref_packages[classname] = info
 
-    # Check that those lists agree
+        # Check that the lists agree
 
-    for p in bundle_packages:
-        if p not in ref_packages:
-            print(f'MISSING {p} - not in packages.txt')
-            n_missing += 1
-            n_errors += 1
+        for p in bundle_packages:
+            if p not in ref_packages:
+                print(f'MISSING {p} - not in packages.txt')
+                n_missing += 1
+                n_errors += 1
+                bootstrap_text = ''
 
-    for p in ref_packages.keys():
-        if p not in bundle_packages:
-            print(f'REMOVED {p} - in packages.txt but not bundle')
-            n_removed += 1
-            n_errors += 1
+        for p in ref_packages.keys():
+            if p not in bundle_packages:
+                print(f'REMOVED {p} - in packages.txt but not bundle')
+                n_removed += 1
+                n_errors += 1
+                bootstrap_text = ''
+
+        if n_missing + n_removed > 0:
+            print('NOTE: use --bootstrap to rebuild packages.txt if needed')
 
     # Run the tests
 
-    for pkg, info in ref_packages.items():
+    if settings.bootstrap:
+        pkg_file = open(bundle.path('packages.txt'), 'wt')
+        pkg_iter = sorted(ref_packages.keys())
+    else:
+        pkg_file = None
+        pkg_iter = ref_packages.keys()
+
+    for pkg in pkg_iter:
+        info = ref_packages[pkg]
         tags = info['tags']
 
-        if 'randkey' in info:
+        if 'randkey' in info and not settings.bootstrap:
             effkey = (info['randkey'] + settings.sample_key) % 100
             random_skipped = (effkey >= settings.sample_percentage)
         else:
@@ -170,6 +194,10 @@ def entrypoint(argv):
                 print('FAIL')
                 n_errors += 1
 
+        if settings.bootstrap:
+            tag = 'ok' if result == 0 else 'skip'
+            print(f'{pkg} {tag} rand={info["randkey"]}', file=pkg_file)
+
     print()
     print('Summary:')
     print(f'- Tested {n_tested} packages')
@@ -184,15 +212,26 @@ def entrypoint(argv):
     if n_surprises:
         print(f'- {n_surprises} surprise passes')
     if n_errors:
-        print(f'- {n_errors} total errors: test failed')
+        if settings.bootstrap:
+            print(f'- {n_errors} total build failures (see outputs in {packagedir})')
+        else:
+            print(f'- {n_errors} total errors: test failed (outputs stored in {packagedir})')
     else:
-        print('- no errors: test passed')
+        print(f'- no errors: test passed (outputs stored in {packagedir})')
 
-    return 1 if n_errors else 0
+    if settings.bootstrap:
+        pkg_file.close()
+
+    return 1 if n_errors and not settings.bootstrap else 0
 
 
 def make_arg_parser():
     p = argparse.ArgumentParser()
+    p.add_argument(
+        '--bootstrap',
+        action = 'store_true',
+        help = 'Bootstrap mode: test all packages, rewrite packages.txt'
+    )
     p.add_argument(
         '-S', '--samp-pct',
         dest = 'sample_percentage',
