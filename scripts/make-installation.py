@@ -35,7 +35,7 @@ def entrypoint(argv):
 
     if git_hash != container_git_hash:
         die(
-            'refusing to proceed since current repo hash {git_hash} does not agree '
+            f'refusing to proceed since current repo hash {git_hash} does not agree '
             'with that used to make containers; rerun `update-containers` step?'
         )
 
