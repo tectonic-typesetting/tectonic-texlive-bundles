@@ -67,9 +67,6 @@ def entrypoint(argv):
     if settings.bootstrap:
         print('note: bootstrap mode engaged! Testing *all* packages and rewriting packages.txt')
         print()
-    else:
-        print(f'note: sampling {settings.sample_percentage}% of the randomized test cases')
-        print(f'note: sample key is {settings.sample_key}; use argument `-K {settings.sample_key}` to reproduce this run`')
 
     # Load the packages from the bundle
 
@@ -126,6 +123,21 @@ def entrypoint(argv):
 
         if n_missing + n_removed > 0:
             print('NOTE: use --bootstrap to rebuild packages.txt if needed')
+
+    # Sampling setup.
+
+    if settings.bootstrap:
+        settings.sample_percentage = 100  # not used, but for tidyness' sake
+    else:
+        if settings.sample_percentage is None:
+            TARGET_N_PACKAGES = 100
+            settings.sample_percentage = max(100 * TARGET_N_PACKAGES // len(ref_packages), 1)
+            n_eff = settings.sample_percentage * len(ref_packages) // 100
+            print(f'note: targeting about {n_eff} randomized test cases ({settings.sample_percentage}% of corpus; actual number will vary)')
+        else:
+            print(f'note: sampling {settings.sample_percentage}% of the randomized test cases')
+
+        print(f'note: sample key is {settings.sample_key}; use argument `-K {settings.sample_key}` to reproduce this run`')
 
     # Run the tests
 
@@ -236,7 +248,6 @@ def make_arg_parser():
         '-S', '--samp-pct',
         dest = 'sample_percentage',
         type = int,
-        default = 5,
         help = 'The percentage of test cases to sample'
     )
     p.add_argument(
