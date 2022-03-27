@@ -102,9 +102,9 @@ def entrypoint(argv):
     if n_removed:
         print(f'- {n_removed} formats in formats.txt removed from bundle')
     if n_errors:
-        print(f'- {n_errors} total errors: test failed')
+        print(f"- {n_errors} total errors: test failed (see outputs in {formatdir})")
     else:
-        print('- no errors: test passed')
+        print(f"- no errors: test passed (outputs stored in {formatdir})")
 
     return 1 if n_errors else 0
 
