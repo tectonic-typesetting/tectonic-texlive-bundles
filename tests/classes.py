@@ -61,17 +61,26 @@ def entrypoint(argv):
 
     # Check that those lists agree
 
-    for c in bundle_classes:
-        if c not in ref_classes:
-            print(f"MISSING {c} - not in classes.txt")
-            n_missing += 1
-            n_errors += 1
+    if settings.update:
+        for c in bundle_classes:
+            if c not in ref_classes:
+                ref_classes[c] = ["ok"]
 
-    for c in ref_classes.keys():
-        if c not in bundle_classes:
-            print(f"REMOVED {c} - in classes.txt but not bundle")
-            n_removed += 1
-            n_errors += 1
+        with open(bundle.path("classes.txt"), "wt") as fref:
+            for classname, tags in sorted(ref_classes.items(), key=lambda t: t[0]):
+                print(classname, ",".join(tags), file=fref)
+    else:
+        for c in bundle_classes:
+            if c not in ref_classes:
+                print(f"MISSING {c} - not in classes.txt")
+                n_missing += 1
+                n_errors += 1
+
+        for c in ref_classes.keys():
+            if c not in bundle_classes:
+                print(f"REMOVED {c} - in classes.txt but not bundle")
+                n_removed += 1
+                n_errors += 1
 
     # Run the tests
 
@@ -106,19 +115,19 @@ def entrypoint(argv):
 
         if result == 0:
             if "ok" in flags:
-                print("pass")
+                print("pass", flush=True)
             else:
                 # This test succeeded even though we didn't expect it to.
                 # Not a bad thing, but worth noting!
-                print("pass (unexpected)")
+                print("pass (unexpected)", flush=True)
                 n_surprises += 1
         else:
             if "xfail" in flags:
-                print("xfail")
+                print("xfail", flush=True)
                 n_xfail += 1
             else:
                 # This test failed unexpectedly :-(
-                print("FAIL")
+                print("FAIL", flush=True)
                 n_errors += 1
 
     print()
@@ -143,8 +152,13 @@ def entrypoint(argv):
 def make_arg_parser():
     p = argparse.ArgumentParser()
     p.add_argument(
-        'bundle_dir',
-        help = 'The directory of the bundle specification',
+        "--update",
+        action="store_true",
+        help="Update mode: test all classes, rewrite classes.txt",
+    )
+    p.add_argument(
+        "bundle_dir",
+        help="The directory of the bundle specification",
     )
     return p
 
