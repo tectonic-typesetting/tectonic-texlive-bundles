@@ -22,13 +22,22 @@ def make_arg_parser():
     return p
 
 
+def commented_file_lines(f):
+    for line in f:
+        line = line.split('#', 1)[0]
+        line = line.strip()
+
+        if line:
+            yield line
+
+
 def entrypoint(argv):
     settings = make_arg_parser().parse_args(argv[1:])
     bundle = Bundle.open_default()
     install_dir = bundle.install_path()
 
     with open(bundle.path('tlpackages.txt')) as f:
-        packages = [l.strip() for l in f]
+        packages = list(commented_file_lines(f))
 
     # Validate that current repo, containers, and install are in sync
 
