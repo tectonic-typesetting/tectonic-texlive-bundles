@@ -29,7 +29,7 @@ reasonable. In particular:
 """
 
 import argparse
-import os
+import os.path
 import random
 import subprocess
 import sys
@@ -90,6 +90,31 @@ def entrypoint(argv):
                 "tags": ["ok"],
                 "randkey": random.randint(0, 99),
             }
+
+        # Minimize churn in randkeys if there's already an input file
+        packages_path = bundle.path("packages.txt")
+
+        if os.path.exists(packages_path):
+            with open(packages_path) as fref:
+                for line in fref:
+                    bits = line.split()
+                    classname = bits[0]
+
+                    if classname not in ref_packages:
+                        continue
+
+                    saw_rand = False
+
+                    for bit in bits[2:]:
+                        if bit.startswith("rand="):
+                            ref_packages[classname]["randkey"] = int(bit[5:])
+                            saw_rand = True
+                            break
+
+                    if (
+                        not saw_rand
+                    ):  # Preserve items with no randkey -- these are always tested
+                        del ref_packages[classname]["randkey"]
     else:
         with open(bundle.path("packages.txt")) as fref:
             for line in fref:
@@ -201,19 +226,19 @@ def entrypoint(argv):
 
         if result == 0:
             if "ok" in tags:
-                print("pass")
+                print("pass", flush=True)
             else:
                 # This test succeeded even though we didn't expect it to.
                 # Not a bad thing, but worth noting!
-                print("pass (unexpected)")
+                print("pass (unexpected)", flush=True)
                 n_surprises += 1
         else:
             if "xfail" in tags:
-                print("xfail")
+                print("xfail", flush=True)
                 n_xfail += 1
             else:
                 # This test failed unexpectedly :-(
-                print("FAIL")
+                print("FAIL", flush=True)
                 n_errors += 1
 
         if settings.bootstrap:
