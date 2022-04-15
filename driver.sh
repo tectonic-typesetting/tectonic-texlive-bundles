@@ -1,5 +1,5 @@
 #! /bin/bash
-# Copyright 2016-2020 the Tectonic Project.
+# Copyright 2016-2022 the Tectonic Project.
 # Licensed under the MIT License.
 
 image_name=tectonic-texlive-bundler
@@ -19,12 +19,13 @@ set -e
 if [ -z "$1" -o "$1" = help ] ; then
     echo "You must supply a subcommand. Main subcommands are (in usual workflow order):
 
-  build-image       -- Create or update the bundler Docker image.
-  update-containers -- (Re)build the TeXLive \"container\" files.
-  make-installation -- Install TeXLive into a new directory tree.
-  install-packages  -- Add packages to a TeXLive installation tree.
-  make-zipfile      -- Make a Zip file from a TeXLive installation tree.
-  make-itar         -- Convert a bundle from Zip format to indexed-tar format.
+  build-image         -- Create or update the bundler Docker image.
+  update-containers   -- (Re)build the TeXLive \"container\" files.
+  make-installation   -- Install TeXLive into a new directory tree.
+  install-packages    -- Add packages to a TeXLive installation tree.
+  get-vendor-pristine -- Extract vendor-pristine versions of patched files.
+  make-zipfile        -- Make a Zip file from a TeXLive installation tree.
+  make-itar           -- Convert a bundle from Zip format to indexed-tar format.
 
 Also:
 
@@ -75,6 +76,34 @@ function build_image () {
 
 function bundler_bash () {
     exec docker run -it --rm "${docker_args[@]}" $image_name bash
+}
+
+
+function get_vendor_pristine () {
+    local bundle_dir="$1"
+    shift || die "usage: $0 get-vendor-pristine <bundle-dir>"
+
+    use_bundle "$bundle_dir"
+
+    docker run -it --rm "${docker_args[@]}" $image_name \
+        python /source/scripts/get-vendor-pristine.py "$@"
+
+    # (ab)use this helper to get the artifacts directory:
+    ziprel="$(docker run --rm "${docker_args[@]}" $image_name python /source/scripts/misc.py zip-relpath)"
+    artifacts="$(dirname "$ziprel")"
+    vname="$(basename "$artifacts")"
+    cur_branch="$(git symbolic-ref --short -q HEAD)"
+
+    echo
+    echo "Now do something like the following:"
+    echo
+    echo "1) git status # confirm that tree and index are clean"
+    echo "2) git switch vendor-pristine"
+    echo "3) cp $artifacts/vendor-pristine/* $bundle_dir/patched/"
+    echo "4) git add $bundle_dir/patched/"
+    echo "5) git commit -m \"$bundle_dir: update vendored files for $vname\""
+    echo "6) git switch $cur_branch"
+    echo "7) git merge vendor-pristine # and resolve any conflicts"
 }
 
 
@@ -152,6 +181,8 @@ case "$command" in
         build_image "$@" ;;
     bundler-bash)
         bundler_bash "$@" ;;
+    get-vendor-pristine)
+        get_vendor_pristine "$@" ;;
     install-packages)
         install_packages "$@" ;;
     make-installation)

@@ -57,8 +57,6 @@ TeXLive tree you currently have checked out in `state/repo`.*
 
 ## Creating a TeXLive installation tree
 
-**NOTE: this workflow is still evolving!**
-
 Run:
 
 ```
@@ -71,9 +69,30 @@ creating specialized bundles. The `tlextras` bundle is the one-size-fits-all
 default bundle.)
 
 
-## Exporting to a Zip-format bundle
+## Updating patches
 
-**NOTE: this workflow is still evolving!**
+As of TeXLive 2021, we have bitten the bullet and decided to maintain some
+patches against the TeXLive tree.
+
+Maintaining long-lived patches is never fun, but Git makes life a lot easier
+than it could be. We use a secondary branch named `vendor-pristine` to help
+maintain our patches. The way we do that is to copy the “vendor” (TeXLive
+original) files into branch, then use `git merge` to update the main branch with
+whatever changes have been introduced between TeXLive updates.
+
+First, make sure that the current branch is clean with no changes in the working
+tree or index. Then run:
+
+```
+./driver-sh get-vendor-pristine bundles/tlextras
+```
+
+Then follow the suggested workflow as printed out by that command. The basic
+plan is to commit the vendor files into the bundle’s `patched/` directory *on
+the vendor-pristine* branch, then merge them back into the main branch.
+
+
+## Exporting to a Zip-format bundle
 
 Run:
 
@@ -87,8 +106,6 @@ can be used with the `tectonic` command-line program with the `-b` argument.
 
 
 ## Converting to an “indexed tar” bundle
-
-**NOTE: this workflow is still evolving!**
 
 This step is needed to create a bundle that will be hosted on the web. Run:
 
