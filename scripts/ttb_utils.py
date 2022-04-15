@@ -1,5 +1,5 @@
 # -*- mode: python; coding: utf-8 -*-
-# Copyright 2020 the Tectonic Project.
+# Copyright 2020-2022 the Tectonic Project.
 # Licensed under the MIT License.
 
 """
@@ -30,6 +30,7 @@ import contextlib
 import hashlib
 import os.path
 import toml
+import shutil
 import struct
 import subprocess
 import sys
@@ -163,6 +164,14 @@ class Bundle(object):
         chown_host(path)
 
 
+    def vendor_pristine_path(self, basename):
+        path = self.artifact_path('vendor-pristine')
+        os.makedirs(path, exist_ok=True)
+        chown_host('/state/artifacts', recursive=False)
+        chown_host(path)
+        return os.path.join(path, basename)
+
+
     @contextlib.contextmanager
     def create_texlive_profile(self):
         dest = self.install_path()
@@ -221,6 +230,80 @@ class ZipMaker(object):
                     self.ignored_tex_path_prefixes.append(line)
 
 
+    def consider_file(self, tex_path, base_name):
+        """
+        Consider adding the specified TeXLive file to the installation tree.
+        This is where all the nasty hairy logic will accumulate that enables us
+        to come out with a nice pretty tarball in the end.
+        """
+
+        if base_name in IGNORED_BASE_NAMES:
+            return False
+
+        ext_bits = base_name.split('.', 1)
+        if len(ext_bits) > 1 and ext_bits[1] in IGNORED_EXTENSIONS:
+            return False
+
+        if tex_path in self.ignored_tex_paths:
+            return False
+
+        for pfx in self.ignored_tex_path_prefixes:
+            if tex_path.startswith(pfx):
+                return False
+
+        return True
+
+
+    def _walk_onerr(self, oserror):
+        warn(f'error navigating installation tree: {oserror}')
+
+
+    # Preliminaries: extracting any patched files. This helps us maintain the
+    # vendor-pristine branch so that we can use Git's merging capabilities to
+    # maintain long-lived patches against them.
+    #
+    # This is kind of a hack since we're not actually touching any Zip file
+    # here!
+
+    def extract_vendor_pristine(self):
+        install_dir = self.bundle.install_path()
+
+        # Figure out what we need to check for.
+
+        patched_dir = self.bundle.path('patched')
+        patched_basenames = frozenset(os.listdir(patched_dir))
+
+        # Now walk the main tree, using the same logic as go(), but extracting
+        # only the patched files.
+
+        p = os.path.join(install_dir, 'texmf-dist')
+        n = len(p) + 1
+        done_basenames = set()
+        print(f'Scanning {cpath2qhpath(p)} ...')
+
+        for dirpath, _, filenames in os.walk(p, onerror=self._walk_onerr):
+            for fn in filenames:
+                if fn not in patched_basenames:
+                    continue
+
+                full = os.path.join(dirpath, fn)
+                tex = full[n:]
+                if not self.consider_file(tex, fn):
+                    continue
+
+                if fn in done_basenames:
+                    warn(f'duplicated patched file `{fn}`; sticking with the first instance')
+                    continue
+
+                vp = self.bundle.vendor_pristine_path(fn)
+                shutil.copy(full, vp)
+                done_basenames.add(fn)
+
+        print(f'Extracted {len(done_basenames)} files.')
+
+
+    # Actually building the full Zip
+
     def add_file(self, full_path):
         base = os.path.basename(full_path)
 
@@ -254,34 +337,6 @@ class ZipMaker(object):
             pathlist.append(full_path)
 
 
-    def consider_file(self, full_path, tex_path, base_name):
-        """
-        Consider adding the specified TeXLive file to the installation tree.
-        This is where all the nasty hairy logic will accumulate that enables us
-        to come out with a nice pretty tarball in the end.
-        """
-
-        if base_name in IGNORED_BASE_NAMES:
-            return
-
-        ext_bits = base_name.split('.', 1)
-        if len(ext_bits) > 1 and ext_bits[1] in IGNORED_EXTENSIONS:
-            return
-
-        if tex_path in self.ignored_tex_paths:
-            return
-
-        for pfx in self.ignored_tex_path_prefixes:
-            if tex_path.startswith(pfx):
-                return
-
-        self.add_file(full_path)
-
-
-    def _walk_onerr(self, oserror):
-        warn(f'error navigating installation tree: {oserror}')
-
-
     def go(self):
         install_dir = self.bundle.install_path()
 
@@ -306,6 +361,15 @@ class ZipMaker(object):
         for name in os.listdir(extras_dir):
             self.add_file(os.path.join(extras_dir, name))
 
+        # Add the patched files, and make sure not to overwrite them later.
+
+        patched_dir = self.bundle.path('patched')
+        patched_basenames = set()
+
+        for name in os.listdir(patched_dir):
+            self.add_file(os.path.join(patched_dir, name))
+            patched_basenames.add(name)
+
         # Add the main tree.
 
         p = os.path.join(install_dir, 'texmf-dist')
@@ -314,9 +378,13 @@ class ZipMaker(object):
 
         for dirpath, _, filenames in os.walk(p, onerror=self._walk_onerr):
             for fn in filenames:
+                if fn in patched_basenames:
+                    continue
+
                 full = os.path.join(dirpath, fn)
                 tex = full[n:]
-                self.consider_file(full, tex, fn)
+                if self.consider_file(tex, fn):
+                    self.add_file(full)
 
         # Compute a hash of it all.
 
