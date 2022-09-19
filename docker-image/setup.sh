@@ -1,5 +1,5 @@
 #! /bin/bash
-# Copyright 2016-2020 the Tectonic Project.
+# Copyright 2016-2022 the Tectonic Project.
 # Licensed under the MIT License.
 #
 # Set up an image that's ready to generate TeXLive packages reproducibly.
@@ -17,4 +17,7 @@ set -ex
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends $deps
 rm -rf /var/lib/apt/lists/*
+
+git config --global --add safe.directory /state/repo
+
 rm -f /setup.sh  # self-destruct!

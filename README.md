@@ -84,7 +84,7 @@ First, make sure that the current branch is clean with no changes in the working
 tree or index. Then run:
 
 ```
-./driver-sh get-vendor-pristine bundles/tlextras
+./driver.sh get-vendor-pristine bundles/tlextras
 ```
 
 Then follow the suggested workflow as printed out by that command. The basic
