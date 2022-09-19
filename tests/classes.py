@@ -56,7 +56,7 @@ def entrypoint(argv):
         for line in fref:
             bits = line.split()
             classname = bits[0]
-            tags = bits[1].split(",")
+            tags = set(bits[1].split(","))
             ref_classes[classname] = tags
 
     # Check that those lists agree
@@ -64,11 +64,7 @@ def entrypoint(argv):
     if settings.update:
         for c in bundle_classes:
             if c not in ref_classes:
-                ref_classes[c] = ["ok"]
-
-        with open(bundle.path("classes.txt"), "wt") as fref:
-            for classname, tags in sorted(ref_classes.items(), key=lambda t: t[0]):
-                print(classname, ",".join(tags), file=fref)
+                ref_classes[c] = set(["ok"])
     else:
         for c in bundle_classes:
             if c not in ref_classes:
@@ -121,6 +117,15 @@ def entrypoint(argv):
                 # Not a bad thing, but worth noting!
                 print("pass (unexpected)", flush=True)
                 n_surprises += 1
+
+                # Note that if `--update` is not specified, nothing will
+                # actually be done with the changes here:
+                try:
+                    flags.remove("xfail")
+                except KeyError:
+                    pass
+
+                flags.add("ok")
         else:
             if "xfail" in flags:
                 print("xfail", flush=True)
@@ -129,6 +134,15 @@ def entrypoint(argv):
                 # This test failed unexpectedly :-(
                 print("FAIL", flush=True)
                 n_errors += 1
+
+                # Note that if `--update` is not specified, nothing will
+                # actually be done with the changes here:
+                try:
+                    flags.remove("ok")
+                except KeyError:
+                    pass
+
+                flags.add("xfail")
 
     print()
     print("Summary:")
@@ -145,6 +159,13 @@ def entrypoint(argv):
         print(f"- {n_errors} total errors: test failed (see outputs in {classdir})")
     else:
         print(f"- no errors: test passed (outputs stored in {classdir})")
+
+    # Rewrite file, maybe.
+
+    if settings.update:
+        with open(bundle.path("classes.txt"), "wt") as fref:
+            for classname, tags in sorted(ref_classes.items(), key=lambda t: t[0]):
+                print(classname, ",".join(sorted(tags)), file=fref)
 
     return 1 if n_errors else 0
 
