@@ -1,4 +1,5 @@
 BHCexam xfail
+BMSTU-IU8 xfail
 ConcProg ok
 FUpowerdot xfail
 IEEEconf ok
@@ -49,6 +50,7 @@ apa7 ok
 apecon ok
 arabart ok
 arabbook ok
+arabic-book xfail
 arabrep ok
 arabrep1 xfail
 argetabelle ok
@@ -77,6 +79,10 @@ beaulivre ok
 beilstein ok
 beletter ok
 bewerbung ok
+bfhbeamer xfail
+bfhpub xfail
+bfhsciposter xfail
+bfhthesis xfail
 bgteubner xfail
 bidimoderncv xfail
 bidipresentation ok
@@ -84,7 +90,9 @@ biditufte-book xfail
 biditufte-handout xfail
 bitart xfail
 bitbook xfail
+bjfuthesis xfail
 bletter ok
+bmstu xfail
 boek ok
 boek3 ok
 book ok
@@ -96,7 +104,9 @@ brandeis-dissertation ok
 brandeis-problemset xfail
 brandeis-thesis xfail
 brief ok
-businesscard-qrcode xfail
+buctcover xfail
+buctthesis xfail
+businesscard-qrcode ok
 bxjsarticle ok
 bxjsbook ok
 bxjsreport ok
@@ -142,6 +152,7 @@ dfgreporting xfail
 dinbrief ok
 disser xfail
 dithesis xfail
+document-structure xfail
 droit-fr xfail
 dtk ok
 dvdcoll ok
@@ -198,6 +209,7 @@ fiche ok
 fithesis ok
 fithesis2 ok
 fithesis3 ok
+fithesis4 ok
 flacards ok
 flashcard xfail
 flashcards xfail
@@ -208,6 +220,7 @@ g-brief2 ok
 gaceta ok
 gammas xfail
 gatech-thesis xfail
+geradwp ok
 gmdocc ok
 gost732 xfail
 gradstudentresume xfail
@@ -245,6 +258,7 @@ hitszthesis xfail
 hletter ok
 hpsdiss xfail
 hu-berlin-letter xfail
+huawei ok
 hustthesis xfail
 hwexam xfail
 iagproc ok
@@ -286,6 +300,7 @@ juraovw ok
 juraurtl ok
 kdgcoursetext ok,titleauth
 kdgmasterthesis ok,titleauth
+kdpcover ok
 kerntest xfail
 kiyou xfail
 kluwer ok
@@ -300,12 +315,14 @@ leaflet ok
 lebhart ok
 lectures xfail
 legislation xfail
+letgut xfail
 letter ok
 letteracdp ok
 lettre ok
 limap ok
 limecv xfail
 lion-msc xfail
+llncs ok
 lni ok,titleauth
 lps ok
 lt3graph-packagedoc xfail
@@ -373,11 +390,15 @@ nih ok
 nihbiosketch xfail
 njf ok
 njurepo xfail
+njustthesis xfail
+njuthesis ok
 nlctdoc ok
 nostarch xfail
+notesslides ok
 novel xfail
 nrc1 xfail
 nrc2 xfail
+nwafuthesis xfail
 nwejm xfail
 nwejmart ok
 oblivoir ok
@@ -394,6 +415,7 @@ pbsheet xfail
 pdfArticle xfail
 pecha xfail
 petiteannonce ok
+phfextendedabstract ok
 philosophersimprint ok
 pittetd ok
 pkuthss xfail
@@ -418,6 +440,9 @@ quantumarticle xfail
 qyxf-book xfail
 rapport1 ok
 rapport3 ok
+rbt-mathnotes xfail
+rbt-mathnotes-formula-sheet xfail
+rbt-mathnotes-hw xfail
 recipe ok
 recipecard xfail
 refart ok
@@ -466,6 +491,7 @@ sduthesis ok
 seminar xfail
 semproc ok
 sesamanuel xfail
+seu-ml-assign xfail
 seuthesix xfail
 sffms ok,titleauth
 shtthesis xfail
@@ -486,6 +512,8 @@ skdoc xfail
 skeyval-testclass xfail
 skrapport xfail
 slides ok
+smfart ok
+smfbook ok
 smglom xfail
 source2edoc ok
 spie ok
@@ -493,6 +521,7 @@ sr-vorl xfail
 sslides ok
 stage ok
 standalone ok
+stex xfail
 subfiles xfail
 suftesi xfail
 sugconf ok,titleauth
@@ -540,6 +569,7 @@ uantwerpenexam ok
 uantwerpenletter ok
 uantwerpenmasterthesis xfail
 uantwerpenphdthesis ok
+uantwerpenreport ok
 ucalgmthesis ok
 ucbthesis ok
 ucdavisthesis ok
@@ -558,6 +588,7 @@ ulthese xfail
 umich-thesis ok
 umthesis ok
 unam-thesis xfail
+unbtex ok
 unifith ok
 unitn-bimrep xfail
 univie-ling-expose ok
@@ -575,6 +606,8 @@ utarticle xfail
 utbook xfail
 utexasthesis ok
 utreport xfail
+uwa-pcf xfail
+uwa-pif xfail
 uwmslide ok
 uwthesis ok
 verifica ok
@@ -594,6 +627,8 @@ xsim-manual xfail
 yaletter xfail
 yathesis ok
 yazd-thesis ok
+yb-book xfail
 ycbook ok
 ydoc xfail
 york-thesis ok
+zbMATH ok
