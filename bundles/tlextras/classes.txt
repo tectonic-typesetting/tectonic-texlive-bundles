@@ -22,7 +22,7 @@ aastex631 ok
 abntex2 ok
 abstbook ok
 achemso ok,titleauth
-acmart xfail
+acmart ok
 acmconf xfail
 active-conf ok
 adfathesis ok
@@ -86,8 +86,8 @@ bfhthesis xfail
 bgteubner xfail
 bidimoderncv xfail
 bidipresentation ok
-biditufte-book xfail
-biditufte-handout xfail
+biditufte-book ok
+biditufte-handout ok
 bitart xfail
 bitbook xfail
 bjfuthesis xfail
@@ -233,7 +233,7 @@ grant-nih xfail
 grant-nrl xfail
 grant-nsf xfail
 grant-onr xfail
-graphpaper xfail
+graphpaper ok
 gridslides ok
 gsemthesis ok
 guitartabs ok
@@ -305,7 +305,7 @@ kerntest xfail
 kiyou xfail
 kluwer ok
 knittingpattern ok
-komacv xfail
+komacv ok
 ksp-thesis xfail
 l3doc ok
 labbook ok
@@ -360,11 +360,11 @@ milog ok
 minimal ok
 minimart ok
 minimbook ok
-mla xfail
+mla ok
 mluexercise xfail
 mnras ok
 moderncv xfail
-modernposter xfail
+modernposter ok
 movie ok
 msu-thesis ok
 mucproc xfail
@@ -378,7 +378,7 @@ mwrep ok
 my-thesis ok
 mycv ok
 myletter ok
-mynsfc xfail
+mynsfc ok
 nanicolle xfail
 nature ok
 ncc ok
@@ -459,7 +459,7 @@ rtklage xfail
 ryersonSGSThesis xfail
 ryethesis xfail
 sageep ok
-sapthesis xfail
+sapthesis ok
 schuleab ok
 schulein ok
 schuleit ok
@@ -517,7 +517,7 @@ smfbook ok
 smglom xfail
 source2edoc ok
 spie ok
-sr-vorl xfail
+sr-vorl ok
 sslides ok
 stage ok
 standalone ok
