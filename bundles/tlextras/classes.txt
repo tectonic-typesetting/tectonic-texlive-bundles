@@ -44,7 +44,7 @@ amsldoc ok
 amsproc ok
 aomart ok
 apa ok
-apa6 ok
+apa6 xfail - looks unmaintained; uses known option to flushend package
 apa6e xfail
 apa7 ok
 apecon ok
@@ -63,7 +63,7 @@ artikel3 ok
 asaetr ok
 ascelike ok
 asmeconf xfail
-asmejour ok
+asmejour xfail - typo breaks build on XeTeX
 assignment ok
 aucklandthesis ok
 bangorcsthesis xfail
@@ -397,7 +397,7 @@ nrc1 xfail
 nrc2 xfail
 nwafuthesis xfail
 nwejm xfail
-nwejmart ok
+nwejmart xfail - assumes font "Latin Modern Mono" is available
 oblivoir ok
 oblivoir-utf xfail
 oblivoir-xl xfail
@@ -519,7 +519,7 @@ standalone ok
 stex xfail
 subfiles xfail
 suftesi xfail
-sugconf ok,titleauth
+sugconf titleauth,xfail - uses inputenc
 tabriz-thesis ok
 talk ok
 tarticle xfail
@@ -558,7 +558,7 @@ turabian-researchpaper ok
 turabian-thesis ok
 ua-thesis ok
 uafthesis ok
-uantwerpenbamathesis ok
+uantwerpenbamathesis xfail
 uantwerpencoursetext ok
 uantwerpenexam ok
 uantwerpenletter ok
