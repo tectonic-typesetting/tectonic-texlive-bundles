@@ -121,7 +121,6 @@ cd ok
 cd-cover ok
 cesenaexam xfail
 cheatsheet ok
-chemmacros-manual xfail
 chletter ok
 cje xfail
 cnbwp xfail
@@ -219,7 +218,6 @@ g-brief ok
 g-brief2 ok
 gaceta ok
 gammas xfail
-gatech-thesis xfail
 geradwp ok
 gmdocc ok
 gost732 xfail
@@ -355,7 +353,6 @@ memoir ok
 mensa-tex ok
 mentis xfail
 metanorma ok
-mikoslides xfail
 milog ok
 minimal ok
 minimart ok
@@ -406,7 +403,6 @@ oblivoir-utf xfail
 oblivoir-xl xfail
 octavo ok
 oegatb xfail
-omdoc xfail
 onrannual ok
 oup-authoring-template ok
 paper ok
@@ -514,7 +510,6 @@ skrapport xfail
 slides ok
 smfart ok
 smfbook ok
-smglom xfail
 source2edoc ok
 spie ok
 sr-vorl ok
@@ -567,7 +562,6 @@ uantwerpenbamathesis ok
 uantwerpencoursetext ok
 uantwerpenexam ok
 uantwerpenletter ok
-uantwerpenmasterthesis xfail
 uantwerpenphdthesis ok
 uantwerpenreport ok
 ucalgmthesis ok
