@@ -65,6 +65,12 @@ def entrypoint(argv):
         for c in bundle_classes:
             if c not in ref_classes:
                 ref_classes[c] = set(["ok"])
+
+        refclassnames = list(ref_classes.keys())
+
+        for c in refclassnames:
+            if c not in bundle_classes:
+                del ref_classes[c]
     else:
         for c in bundle_classes:
             if c not in ref_classes:
