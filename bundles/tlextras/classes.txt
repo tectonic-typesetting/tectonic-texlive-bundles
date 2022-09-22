@@ -558,7 +558,7 @@ turabian-researchpaper ok
 turabian-thesis ok
 ua-thesis ok
 uafthesis ok
-uantwerpenbamathesis xfail
+uantwerpenbamathesis ok
 uantwerpencoursetext ok
 uantwerpenexam ok
 uantwerpenletter ok
