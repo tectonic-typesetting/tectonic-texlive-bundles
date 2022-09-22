@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 # -*- mode: python; coding: utf-8 -*-
-# Copyright 2020 the Tectonic Project.
+# Copyright 2020-2022 the Tectonic Project.
 # Licensed under the MIT License.
 
 """
@@ -8,7 +8,8 @@ Test builds using all of the LaTeX documentclasses provided in a bundle.
 """
 
 import argparse
-import os
+import os.path
+import shutil
 import subprocess
 import sys
 
@@ -110,6 +111,21 @@ def entrypoint(argv):
 
             if "titleauth" in flags:
                 print(TITLE_AUTHOR, file=f)
+
+            custom_path = os.path.join(settings.bundle_dir, "classes", cls + ".tex")
+            try:
+                with open(custom_path, "rt") as f_custom:
+                    for line in f_custom:
+                        print(line, end="", file=f)
+            except FileNotFoundError:
+                pass
+
+            extras_path = os.path.join(settings.bundle_dir, "classes", cls)
+            if os.path.isdir(extras_path):
+                for item in os.listdir(extras_path):
+                    shutil.copy(
+                        os.path.join(extras_path, item), os.path.join(thisdir, item)
+                    )
 
             print(DOCUMENT_BODY, file=f)
 
