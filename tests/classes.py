@@ -80,7 +80,13 @@ def entrypoint(argv):
 
     # Run the tests
 
-    for cls, flags in ref_classes.items():
+    if settings.classes:
+        filt = frozenset(settings.classes.split(","))
+        to_test = {k: v for k, v in ref_classes.items() if k in filt}
+    else:
+        to_test = ref_classes
+
+    for cls, flags in to_test.items():
         print(cls, "... ", end="")
         n_tested += 1
 
@@ -176,6 +182,11 @@ def make_arg_parser():
         "--update",
         action="store_true",
         help="Update mode: test all classes, rewrite classes.txt",
+    )
+    p.add_argument(
+        "-c",
+        "--classes",
+        help="Test only the specified (comma-separated) classes",
     )
     p.add_argument(
         "bundle_dir",
