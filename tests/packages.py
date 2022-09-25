@@ -103,10 +103,13 @@ def entrypoint(argv):
 
     for p in bundle_packages:
         if p not in ref_packages:
+            # `just_added` enables us to make sure to test new packages in
+            # update mode
             print(f"MISSING {p} - not in packages.txt")
             ref_packages[p] = {
                 "tags": set(["ok"]),
                 "randkey": random.randint(0, 99),
+                "just_added": settings.update,
             }
 
             if not settings.update:
@@ -155,7 +158,9 @@ def entrypoint(argv):
         info = ref_packages[pkg]
         tags = info["tags"]
 
-        if "randkey" in info:
+        if info.get("just_added", False):
+            random_skipped = False
+        elif "randkey" in info:
             effkey = (info["randkey"] + settings.sample_key) % 100
             random_skipped = effkey >= settings.sample_percentage
         else:
