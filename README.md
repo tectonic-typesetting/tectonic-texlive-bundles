@@ -80,11 +80,12 @@ maintain our patches. The way we do that is to copy the “vendor” (TeXLive
 original) files into branch, then use `git merge` to update the main branch with
 whatever changes have been introduced between TeXLive updates.
 
-First, make sure that the current branch is clean with no changes in the working
-tree or index. Then run:
+First, bump the version of your bundle and run the standard update steps through
+the `install-packages` step described above. Make sure that the current branch
+is clean with no changes in the working tree or index. Then run:
 
 ```
-./driver-sh get-vendor-pristine bundles/tlextras
+./driver.sh get-vendor-pristine bundles/tlextras
 ```
 
 Then follow the suggested workflow as printed out by that command. The basic

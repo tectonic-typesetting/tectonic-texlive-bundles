@@ -64,10 +64,8 @@ def entrypoint(argv):
     if settings.sample_key is None:
         settings.sample_key = random.randint(0, 99)
 
-    if settings.bootstrap:
-        print(
-            "note: bootstrap mode engaged! Testing *all* packages and rewriting packages.txt"
-        )
+    if settings.update:
+        print("note: update mode engaged - will rewrite packages.txt")
         print()
 
     # Load the packages from the bundle
@@ -80,114 +78,89 @@ def entrypoint(argv):
             if base.endswith(".sty"):
                 bundle_packages.add(base[:-4])
 
-    # Compare to the test reference data, if we're not in bootstrap mode:
+    # Load the stored information
 
     ref_packages = {}
+    packages_path = bundle.path("packages.txt")
 
-    if settings.bootstrap:
-        for pkg in bundle_packages:
-            ref_packages[pkg] = {
-                "tags": ["ok"],
+    with open(packages_path) as fref:
+        for line in fref:
+            bits = line.split()
+            classname = bits[0]
+            info = {}
+
+            info["tags"] = set(bits[1].split(","))
+
+            for bit in bits[2:]:
+                if bit.startswith("rand="):
+                    info["randkey"] = int(bit[5:])
+                else:
+                    die(f"unexpected metadata item {bit!r} in packages.txt")
+
+            ref_packages[classname] = info
+
+    # Cross-check the two lists
+
+    for p in bundle_packages:
+        if p not in ref_packages:
+            # `just_added` enables us to make sure to test new packages in
+            # update mode
+            print(f"MISSING {p} - not in packages.txt")
+            ref_packages[p] = {
+                "tags": set(["ok"]),
                 "randkey": random.randint(0, 99),
+                "just_added": settings.update,
             }
 
-        # Minimize churn in randkeys if there's already an input file
-        packages_path = bundle.path("packages.txt")
-
-        if os.path.exists(packages_path):
-            with open(packages_path) as fref:
-                for line in fref:
-                    bits = line.split()
-                    classname = bits[0]
-
-                    if classname not in ref_packages:
-                        continue
-
-                    saw_rand = False
-
-                    for bit in bits[2:]:
-                        if bit.startswith("rand="):
-                            ref_packages[classname]["randkey"] = int(bit[5:])
-                            saw_rand = True
-                            break
-
-                    if (
-                        not saw_rand
-                    ):  # Preserve items with no randkey -- these are always tested
-                        del ref_packages[classname]["randkey"]
-    else:
-        with open(bundle.path("packages.txt")) as fref:
-            for line in fref:
-                bits = line.split()
-                classname = bits[0]
-                info = {}
-
-                info["tags"] = bits[1].split(",")
-
-                for bit in bits[2:]:
-                    if bit.startswith("rand="):
-                        info["randkey"] = int(bit[5:])
-                    else:
-                        die(f"unexpected metadata item {bit!r} in packages.txt")
-
-                ref_packages[classname] = info
-
-        # Check that the lists agree
-
-        for p in bundle_packages:
-            if p not in ref_packages:
-                print(f"MISSING {p} - not in packages.txt")
+            if not settings.update:
                 n_missing += 1
                 n_errors += 1
-                bootstrap_text = ""
 
-        for p in ref_packages.keys():
-            if p not in bundle_packages:
-                print(f"REMOVED {p} - in packages.txt but not bundle")
+    refkeys = list(ref_packages.keys())
+
+    for p in refkeys:
+        if p not in bundle_packages:
+            print(f"REMOVED {p} - in packages.txt but not bundle")
+            del ref_packages[p]
+
+            if not settings.update:
                 n_removed += 1
                 n_errors += 1
-                bootstrap_text = ""
 
-        if n_missing + n_removed > 0:
-            print("NOTE: use --bootstrap to rebuild packages.txt if needed")
+    if n_missing + n_removed > 0:
+        print("NOTE: use --update to rebuild packages.txt if needed")
 
     # Sampling setup.
 
-    if settings.bootstrap:
-        settings.sample_percentage = 100  # not used, but for tidyness' sake
-    else:
-        if settings.sample_percentage is None:
-            TARGET_N_PACKAGES = 100
-            settings.sample_percentage = max(
-                100 * TARGET_N_PACKAGES // len(ref_packages), 1
-            )
-            n_eff = settings.sample_percentage * len(ref_packages) // 100
-            print(
-                f"note: targeting about {n_eff} randomized test cases ({settings.sample_percentage}% of corpus; actual number will vary)"
-            )
-        else:
-            print(
-                f"note: sampling {settings.sample_percentage}% of the randomized test cases"
-            )
-
-        print(
-            f"note: sample key is {settings.sample_key}; use argument `-K {settings.sample_key}` to reproduce this run`"
+    if settings.sample_percentage is None:
+        TARGET_N_PACKAGES = 100
+        settings.sample_percentage = max(
+            100 * TARGET_N_PACKAGES // len(ref_packages), 1
         )
+        n_eff = settings.sample_percentage * len(ref_packages) // 100
+        print(
+            f"note: targeting about {n_eff} randomized test cases ({settings.sample_percentage}% of corpus; actual number will vary)"
+        )
+    else:
+        print(
+            f"note: sampling {settings.sample_percentage}% of the randomized test cases"
+        )
+
+    print(
+        f"note: sample key is {settings.sample_key}; use argument `-K {settings.sample_key}` to reproduce this run`"
+    )
 
     # Run the tests
 
-    if settings.bootstrap:
-        pkg_file = open(bundle.path("packages.txt"), "wt")
-        pkg_iter = sorted(ref_packages.keys())
-    else:
-        pkg_file = None
-        pkg_iter = ref_packages.keys()
+    refkeys = sorted(ref_packages.keys())
 
-    for pkg in pkg_iter:
+    for pkg in refkeys:
         info = ref_packages[pkg]
         tags = info["tags"]
 
-        if "randkey" in info and not settings.bootstrap:
+        if info.get("just_added", False):
+            random_skipped = False
+        elif "randkey" in info:
             effkey = (info["randkey"] + settings.sample_key) % 100
             random_skipped = effkey >= settings.sample_percentage
         else:
@@ -232,6 +205,13 @@ def entrypoint(argv):
                 # Not a bad thing, but worth noting!
                 print("pass (unexpected)", flush=True)
                 n_surprises += 1
+
+            try:
+                tags.remove("xfail")
+            except KeyError:
+                pass
+
+            tags.add("ok")
         else:
             if "xfail" in tags:
                 print("xfail", flush=True)
@@ -241,9 +221,13 @@ def entrypoint(argv):
                 print("FAIL", flush=True)
                 n_errors += 1
 
-        if settings.bootstrap:
-            tag = "ok" if result == 0 else "skip"
-            print(f'{pkg} {tag} rand={info["randkey"]}', file=pkg_file)
+            if settings.update:
+                try:
+                    tags.remove("ok")
+                except KeyError:
+                    pass
+
+                tags.add("xfail")
 
     print()
     print("Summary:")
@@ -259,27 +243,39 @@ def entrypoint(argv):
     if n_surprises:
         print(f"- {n_surprises} surprise passes")
     if n_errors:
-        if settings.bootstrap:
-            print(f"- {n_errors} total build failures (see outputs in {packagedir})")
-        else:
-            print(
-                f"- {n_errors} total errors: test failed (outputs stored in {packagedir})"
-            )
+        print(
+            f"- {n_errors} total errors: test failed (outputs stored in {packagedir})"
+        )
     else:
         print(f"- no errors: test passed (outputs stored in {packagedir})")
 
-    if settings.bootstrap:
-        pkg_file.close()
+    # Update listing if needed
 
-    return 1 if n_errors and not settings.bootstrap else 0
+    if settings.update:
+        with open(packages_path, "wt") as f:
+            for pkg in refkeys:
+                info = ref_packages[pkg]
+                tag_text = ",".join(sorted(info["tags"]))
+
+                randkey = info.get("randkey")
+                if randkey is None:
+                    rest = ""
+                else:
+                    rest = f" rand={randkey}"
+
+                print(pkg, " ", tag_text, rest, sep="", file=f)
+
+    # All done!
+
+    return 1 if n_errors and not settings.update else 0
 
 
 def make_arg_parser():
     p = argparse.ArgumentParser()
     p.add_argument(
-        "--bootstrap",
+        "--update",
         action="store_true",
-        help="Bootstrap mode: test all packages, rewrite packages.txt",
+        help="Update mode: sync packages.txt to bundle; may wish to use `-S 100` too",
     )
     p.add_argument(
         "-S",

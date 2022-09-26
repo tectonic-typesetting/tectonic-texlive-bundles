@@ -1,0 +1,140 @@
+%%
+%% This is file `uantwerpencommonoptions.clo',
+%% generated with the docstrip utility.
+%%
+%% The original source files were:
+%%
+%% uantwerpendocs.dtx  (with options: `clo')
+%% 
+%% This is a generated file.
+%% 
+%% Copyright (C) 2013-2021  by Walter Daems <walter.daems@uantwerpen.be>
+%% 
+%% This work may be distributed and/or modified under the conditions of
+%% the LaTeX Project Public License, either version 1.3 of this license
+%% or (at your option) any later version.  The latest version of this
+%% license is in:
+%% 
+%%    http://www.latex-project.org/lppl.txt
+%% 
+%% and version 1.3 or later is part of all distributions of LaTeX version
+%% 2005/12/01 or later.
+%% 
+%% This work has the LPPL maintenance status `maintained'.
+%% 
+%% The Current Maintainer of this work is Walter Daems.
+%% 
+\ProvidesFile{uantwerpencommonoptions.clo}
+\newif\if@neutralcolors
+\@neutralcolorsfalse
+\DeclareOption{neutralcolors}{\@neutralcolorstrue}
+
+\newcommand*\colormodel{rgb}
+\newif\if@cmyk
+\@cmykfalse
+\DeclareOption{cmyk}{\renewcommand*\colormodel{cmyk}\@cmyktrue}
+\DeclareOption{rgb}{\renewcommand*\colormodel{rgb}\@cmykfalse}
+
+\newcommand*\facinenglish[1]{\renewcommand\@faculty{#1}}
+\newcommand*\facindutch[1]{
+  \AtBeginDocument{
+    \makeatother
+    \@ifpackageloaded{babel}{
+      \addto\captionsdutch{\renewcommand*\@faculty{#1}}
+    }{}
+    \makeatletter
+  }
+}
+\newcommand*\fselector{ua}
+\newcommand*\lselector{en}
+\newlength\logounitheight
+\setlength\logounitheight{0.8cm}
+
+\newcommand*\@faculty{~}
+\DeclareOption{be}{
+  \renewcommand*\fselector{be}
+  \setlength\logounitheight{1cm}
+  \facinenglish{Faculty of Business and Economics}
+  \facindutch{Faculteit Bedrijfswetenschappen en Economie}
+}
+\DeclareOption{fbd}{
+  \renewcommand*\fselector{fbd}
+  \setlength\logounitheight{1cm}
+  \facinenglish{Faculty of Pharmaceutical, Biomedical and Veterinary Sciences}
+  \facindutch{Faculteit Farmaceutische, Biomedische en Diergeneeskundige
+      Wetenschappen}
+}
+\DeclareOption{ggw}{
+  \renewcommand*\fselector{ggw}
+  \setlength\logounitheight{1cm}
+  \facinenglish{
+    Faculty of Medicine and Health Sciences}
+  \facindutch{Faculteit Geneeskunde en Gezondheidswetenschappen}
+}
+\DeclareOption{lw}{
+  \renewcommand*\fselector{lw}
+  \setlength\logounitheight{1cm}
+  \facinenglish{Faculty of Arts}
+  \facindutch{Faculteit Letteren en Wijsbegeerte}
+}
+\DeclareOption{ow}{
+  \renewcommand*\fselector{ow}
+  \setlength\logounitheight{1cm}
+  \facinenglish{Faculty of Design Sciences}
+  \facindutch{Faculteit Ontwerpwetenschappen}
+}
+\DeclareOption{re}{
+  \renewcommand*\fselector{re}
+  \setlength\logounitheight{1cm}
+  \facinenglish{Faculty of Law}
+  \facindutch{Faculteit Rechten}
+}
+\DeclareOption{sw}{
+  \renewcommand*\fselector{sw}
+  \setlength\logounitheight{1cm}
+  \facinenglish{Faculty of Social Sciences}
+  \facindutch{Faculteit Sociale Wetenschappen}
+ }
+\DeclareOption{ti}{
+  \renewcommand*\fselector{ti}
+  \setlength\logounitheight{1cm}
+  \facinenglish{Faculty of Applied Engineering}
+  \facindutch{Faculteit Toegepaste Ingenieurswetenschappen}
+}
+\DeclareOption{we}{
+  \renewcommand*\fselector{we}
+  \setlength\logounitheight{1cm}
+  \facinenglish{Faculty of Science}
+  \facindutch{Faculteit Wetenschappen}
+}
+\DeclareOption{iob}{
+  \renewcommand*\fselector{iob}
+  \setlength\logounitheight{1cm}
+  \facinenglish{Institute of Development Policy}
+  \facindutch{Instituut voor Ontwikkelingsbeleid- en beheer}
+}
+\newcommand*\@facultyacronym{\expandafter\uppercase\expandafter{\fselector}}
+
+\AtBeginDocument{
+  \makeatother
+  \@ifpackageloaded{babel}{
+    \addto\captionsdutch{
+      \renewcommand*\lselector{nl}
+    }{}
+  }
+  \makeatletter
+
+  \newcommand*\logopos{logo-uantwerpen-\fselector-\lselector-\colormodel-pos}
+  \newcommand*\logoposua{logo-uantwerpen-ua-\lselector-\colormodel-pos}
+  \newcommand*\logoneg{logo-uantwerpen-\fselector-\lselector-\colormodel-neg}
+  \newcommand*\logonegua{logo-uantwerpen-ua-\lselector-\colormodel-neg}
+  \newcommand*\logomonowhite{logo-uantwerpen-\fselector-\lselector-\colormodel-mono-white}
+  \newcommand*\logomonowhiteua{logo-uantwerpen-ua-\lselector-\colormodel-mono-white}
+  \newcommand*\iconfile{icon-uantwerpen-\fselector-\colormodel}
+  \newcommand*\iconfileua{icon-uantwerpen-ua-\colormodel}
+}
+
+
+\endinput
+%%
+%% End of file `uantwerpencommonoptions.clo'.
