@@ -110,9 +110,6 @@ docker_args=(
 	--privileged
 	-e HOSTUID=$(id -u)
 	-e HOSTGID=$(id -g)
-	-e bundle_name="${bundle_name}"
-	-e bundle_texlive_version="${bundle_texlive_version}"
-	-e bundle_texlive_hash="${bundle_texlive_hash}"
 	-v "$iso_file":/iso.img:ro,z
 	-v "$install_dir":/install:rw,z
 	-v "$output_dir":/output:rw,z
@@ -190,10 +187,10 @@ fi
 
 # Convert zip bundle to an indexed tar bundle
 if [[ "${job}" == "all" || "${job}" == "itar" ]]; then
-	tar_path="${output_dir}/$(basename "$zip_path" .zip).tar"
+	tar_path="${output_dir}/${bundle_name}.tar"
 	rm -f "$tar_path"
 
-	echo "Generating $(relative "${all_dir}")..."
+	echo "Generating $(relative "${tar_path}")..."
 	cd $(dirname $0)/zip2tarindex
 	exec cargo run --release -- "$zip_path" "$tar_path"
 	echo ""

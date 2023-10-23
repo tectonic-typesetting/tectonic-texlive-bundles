@@ -18,9 +18,10 @@ function check_iso_hash () {
 	if [[ "${hash}" == "${bundle_texlive_hash}" ]]; then
 		echo "OK: hash matches."
 	else
-		echo "Error: checksums do not match:"
-		echo "Got      $hash"
-		echo "Expected $bundle_texlive_hash"
+		echo "Error: checksums do not match."
+		echo ""
+		echo "Got       $hash"
+		echo "Expected  $bundle_texlive_hash"
 		exit 1
 	fi
 }
@@ -41,6 +42,8 @@ function install () {
 	echo "It is $(date +%H:%M:%S)"
 	echo "Installing TeXlive, this may take a while... (~15 minutes)"
 	echo "Logs are streamed to build/install/${bundle_name}/tl-install.log"
+	echo "Warnings will be printed below."
+	echo ""
 
 	cd /iso-mount
 	rm -f "/install/tl-install.log"
@@ -48,6 +51,8 @@ function install () {
 	result="$?"
 
 	echo "Done, cleaning up..."
+	echo ""
+	echo ""
 
 	# Cleanup
 	cd /
