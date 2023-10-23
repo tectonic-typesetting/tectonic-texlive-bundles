@@ -1,18 +1,24 @@
-# Copyright 2016-2020 the Tectonic Project.
-# Licensed under the MIT License.
-#
-# See ../driver.sh for a simple build recipe.
-
 FROM ubuntu:20.04
 
+VOLUME /iso/
 VOLUME /bundle/
-VOLUME /source/
-VOLUME /state/
+VOLUME /build/
 
-COPY setup.sh /
-RUN ["/bin/bash", "/setup.sh"]
-# copy entrypoint separately to speed rebuilds
-COPY entrypoint.sh /
-RUN ["/bin/chmod", "+x", "/entrypoint.sh"]
+ENV DEBIAN_FRONTEND noninteractive
+RUN apt-get update && \
+    apt-get install -yq --no-install-recommends \
+        libdigest-perl-md5-perl \
+        libfontconfig1 \
+        git-core \
+        python3 \
+        python3-toml \
+        wget \
+    && \
+    rm -rf /var/lib/apt/lists/*
+
+
+COPY --chmod=770 entrypoint.sh /
+COPY scripts /scripts
+
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["help"]

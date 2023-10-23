@@ -8,8 +8,8 @@ Utilities for the Tectonic bundler infrastructure.
 Fixed characteristics of the environment:
 
 - Source tree for the tools is in /source/
-- Data/state directory is /state/
-- TeXLive repository is in /state/repo/
+- Data/build directory is /build/
+- Iso should be mounted at /iso/
 - Bundle specification is in /bundle/
 - The numeric UID and GID of the executing user in the host environment are
   stored in the environment variables $HOSTUID and $HOSTGID.
@@ -29,7 +29,6 @@ warn
 import contextlib
 import hashlib
 import os.path
-import toml
 import shutil
 import struct
 import subprocess
@@ -64,7 +63,7 @@ def chown_host(path, recursive=True):
 
 def cpath2qhpath(container_path):
     "Container path to quoted host path."
-    if container_path.startswith('/state/'):
+    if container_path.startswith('/build/'):
         return f'`{container_path[1:]}`'
 
     return f'(container path) `{container_path}``'
@@ -77,26 +76,26 @@ def get_repo_version():
 
     subprocess.check_call(
         ['git', 'update-index', '-q', '--refresh'],
-        cwd = '/state/repo',
+        cwd = '/build/repo',
     )
 
     output = subprocess.check_output(
         ['git', 'diff-index', '--name-only', 'HEAD', '--'],
-        cwd = '/state/repo',
+        cwd = '/build/repo',
     )
     if len(output):
         raise Exception('refusing to work from a modified TeXLive Git checkout')
 
     output = subprocess.check_output(
         ['git', 'show-ref', '--head'],
-        cwd = '/state/repo',
+        cwd = '/build/repo',
     )
     head_hash = output.split(b' ', 1)[0]
     head_hash = head_hash.decode('ascii')
 
     output = subprocess.check_output(
         ['git', 'show', '-s'],
-        cwd = '/state/repo',
+        cwd = '/build/repo',
     )
     svn_rev = 'unknown'
     for line in output.splitlines():
@@ -111,7 +110,6 @@ def get_repo_version():
 
 
 class Bundle(object):
-    cfg = None
     name = None
     version = None
 
@@ -119,12 +117,8 @@ class Bundle(object):
     def open_default(cls):
         inst = cls()
 
-        with open('/bundle/bundle.toml', 'rt') as f:
-            cfg = toml.load(f)
-
-        inst.cfg = cfg
-        inst.name = cfg['bundle']['name']
-        inst.version = cfg['bundle']['version']
+        inst.name = os.environ['bn_name']
+        inst.version = os.environ['bn_texlive_version']
 
         return inst
 
@@ -134,40 +128,40 @@ class Bundle(object):
 
 
     def install_path(self, *segments):
-        return os.path.join('/state/installs', f'{self.name}-{self.version}', *segments)
+        return os.path.join('/build/installs', f'{self.name}-{self.version}', *segments)
 
 
-    def artifact_path(self, *segments):
-        return os.path.join('/state/artifacts', f'{self.name}-{self.version}', *segments)
+    def output_path(self, *segments):
+        return os.path.join('/build/output', f'{self.name}-{self.version}', *segments)
 
 
     def zip_path(self):
-        return self.artifact_path(f'{self.name}-{self.version}.zip')
+        return self.output_path(f'{self.name}-{self.version}.zip')
 
 
     def tar_path(self):
-        return self.artifact_path(f'{self.name}-{self.version}.tar')
+        return self.output_path(f'{self.name}-{self.version}.tar')
 
 
     def listing_path(self):
-        return self.artifact_path(f'{self.name}-{self.version}.listing.txt')
+        return self.output_path(f'{self.name}-{self.version}.listing.txt')
 
 
     def digest_path(self):
-        return self.artifact_path(f'{self.name}-{self.version}.sha256sum')
+        return self.output_path(f'{self.name}-{self.version}.sha256sum')
 
 
     def ensure_artfact_dir(self):
-        path = self.artifact_path()
+        path = self.output_path()
         os.makedirs(path, exist_ok=True)
-        chown_host('/state/artifacts', recursive=False)
+        chown_host('/build/output', recursive=False)
         chown_host(path)
 
 
     def vendor_pristine_path(self, basename):
-        path = self.artifact_path('vendor-pristine')
+        path = self.output_path('vendor-pristine')
         os.makedirs(path, exist_ok=True)
-        chown_host('/state/artifacts', recursive=False)
+        chown_host('/build/output', recursive=False)
         chown_host(path)
         return os.path.join(path, basename)
 
@@ -340,20 +334,6 @@ class ZipMaker(object):
     def go(self):
         install_dir = self.bundle.install_path()
 
-        # Add a couple of version files from the builder.
-
-        p = os.path.join(install_dir, 'SVNREV')
-        if os.path.exists(p):
-            self.add_file(p)
-        else:
-            warn(f'expected but did not see the file `{p}`')
-
-        p = os.path.join(install_dir, 'GITHASH')
-        if os.path.exists(p):
-            self.add_file(p)
-        else:
-            warn(f'expected but did not see the file `{p}`')
-
         # Add the extra files preloaded in the bundle
 
         extras_dir = self.bundle.path('extras')
@@ -406,7 +386,7 @@ class ZipMaker(object):
         if len(self.clashes):
             warn(f'{len(self.clashes)} clashing basenames were observed')
 
-            report_path = self.bundle.artifact_path('clash-report.txt')
+            report_path = self.bundle.output_path('clash-report.txt')
             warn(f'logging clash report to {cpath2qhpath(report_path)}')
 
             with open(report_path, 'wt') as f:
