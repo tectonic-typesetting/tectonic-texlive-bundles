@@ -1,6 +1,4 @@
 # -*- mode: python; coding: utf-8 -*-
-# Copyright 2016-2018 the Tectonic Project.
-# Licensed under the MIT License.
 
 """
 This script is meant to be run inside the TeXLive bundler Docker container.
@@ -26,33 +24,34 @@ def make_arg_parser():
 
 def entrypoint(argv):
     settings = make_arg_parser().parse_args(argv[1:])
-    bundle = Bundle.open_default()
-    bundle.ensure_artfact_dir()
 
     paths = []
 
+    name = os.environ["bn_name"]
+    version = os.environ["bn_texlive_version"]
+
     try:
-        zip_path = bundle.zip_path()
+        zip_path = f"/output/{name}-{version}.zip"
         paths.append(zip_path)
 
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, True) as zip:
-            b = ZipMaker(bundle, zip)
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, True) as zip:
+            b = ZipMaker(zip)
             b.go()
 
-        print('Final SHA256SUM:', b.final_hexdigest)
+        print("Final SHA256SUM:", b.final_hexdigest)
 
-        digest_path = bundle.digest_path()
-        print(f'Creating digest file {cpath2qhpath(digest_path)}')
+        digest_path = f"/output/{name}-{version}.sha256sum"
+        print(f"Creating digest file in {digest_path}")
         paths.append(digest_path)
 
-        with open(digest_path, 'wt') as f:
+        with open(digest_path, "wt") as f:
             print(b.final_hexdigest, file=f)
 
-        listing_path = bundle.listing_path()
-        print(f'Creating listing file {cpath2qhpath(listing_path)}')
+        listing_path = f"/output/{name}-{version}.listing.txt"
+        print(f"Creating listing file in {listing_path}")
         paths.append(listing_path)
 
-        with open(listing_path, 'wt') as f:
+        with open(listing_path, "wt") as f:
             b.write_listing(f)
 
         for p in paths:
@@ -66,5 +65,5 @@ def entrypoint(argv):
         raise e
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(entrypoint(sys.argv))

@@ -1,6 +1,5 @@
 # -*- mode: python; coding: utf-8 -*-
-# Copyright 2020-2022 the Tectonic Project.
-# Licensed under the MIT License.
+
 
 """
 Utilities for the Tectonic bundler infrastructure.
@@ -16,15 +15,12 @@ Fixed characteristics of the environment:
 
 """
 
-__all__ = '''
-Bundle
+__all__ = """
 ZipMaker
 chown_host
-cpath2qhpath
 die
-get_repo_version
 warn
-'''.split()
+""".split()
 
 import contextlib
 import hashlib
@@ -37,16 +33,16 @@ import tempfile
 
 
 def warn(text):
-    print('warning:', text, file=sys.stderr)
+    print("warning:", text, file=sys.stderr)
 
 
 def die(text):
-    raise SystemExit(f'error: {text}')
+    raise SystemExit(f"error: {text}")
 
 
 def chown_host(path, recursive=True):
-    uid = int(os.environ['HOSTUID'])
-    gid = int(os.environ['HOSTGID'])
+    uid = int(os.environ["HOSTUID"])
+    gid = int(os.environ["HOSTGID"])
 
     os.chown(path, uid, gid)
 
@@ -61,147 +57,28 @@ def chown_host(path, recursive=True):
             os.lchown(os.path.join(dirpath, fname), uid, gid)
 
 
-def cpath2qhpath(container_path):
-    "Container path to quoted host path."
-    if container_path.startswith('/build/'):
-        return f'`{container_path[1:]}`'
-
-    return f'(container path) `{container_path}``'
-
-
-def get_repo_version():
-    """
-    Returns (git-hash-as-hex-text, svn-revision)
-    """
-
-    subprocess.check_call(
-        ['git', 'update-index', '-q', '--refresh'],
-        cwd = '/build/repo',
-    )
-
-    output = subprocess.check_output(
-        ['git', 'diff-index', '--name-only', 'HEAD', '--'],
-        cwd = '/build/repo',
-    )
-    if len(output):
-        raise Exception('refusing to work from a modified TeXLive Git checkout')
-
-    output = subprocess.check_output(
-        ['git', 'show-ref', '--head'],
-        cwd = '/build/repo',
-    )
-    head_hash = output.split(b' ', 1)[0]
-    head_hash = head_hash.decode('ascii')
-
-    output = subprocess.check_output(
-        ['git', 'show', '-s'],
-        cwd = '/build/repo',
-    )
-    svn_rev = 'unknown'
-    for line in output.splitlines():
-        if b'git-svn-id:' in line:
-            idx = line.index(b'@')
-            line = line[idx+1:]
-            svn_rev = line.split(b' ', 1)[0]
-            svn_rev = svn_rev.decode('ascii')
-            break
-
-    return head_hash, svn_rev
-
-
-class Bundle(object):
-    name = None
-    version = None
-
-    @classmethod
-    def open_default(cls):
-        inst = cls()
-
-        inst.name = os.environ['bn_name']
-        inst.version = os.environ['bn_texlive_version']
-
-        return inst
-
-
-    def path(self, *segments):
-        return os.path.join('/bundle', *segments)
-
-
-    def install_path(self, *segments):
-        return os.path.join('/build/installs', f'{self.name}-{self.version}', *segments)
-
-
-    def output_path(self, *segments):
-        return os.path.join('/build/output', f'{self.name}-{self.version}', *segments)
-
-
-    def zip_path(self):
-        return self.output_path(f'{self.name}-{self.version}.zip')
-
-
-    def tar_path(self):
-        return self.output_path(f'{self.name}-{self.version}.tar')
-
-
-    def listing_path(self):
-        return self.output_path(f'{self.name}-{self.version}.listing.txt')
-
-
-    def digest_path(self):
-        return self.output_path(f'{self.name}-{self.version}.sha256sum')
-
-
-    def ensure_artfact_dir(self):
-        path = self.output_path()
-        os.makedirs(path, exist_ok=True)
-        chown_host('/build/output', recursive=False)
-        chown_host(path)
-
-
-    def vendor_pristine_path(self, basename):
-        path = self.output_path('vendor-pristine')
-        os.makedirs(path, exist_ok=True)
-        chown_host('/build/output', recursive=False)
-        chown_host(path)
-        return os.path.join(path, basename)
-
-
-    @contextlib.contextmanager
-    def create_texlive_profile(self):
-        dest = self.install_path()
-
-        with tempfile.NamedTemporaryFile(delete=False, mode='wt') as f:
-            with open(self.path('tl-profile.txt'), 'rt') as template:
-                for line in template:
-                    line = line.replace('@dest@', dest)
-                    print(line, file=f, end='')
-
-            f.close()
-            yield f.name
-
 
 IGNORED_BASE_NAMES = set([
-    '00readme.txt',
-    'LICENSE.md',
-    'Makefile',
-    'README',
-    'README.md',
-    'ls-R',
+    "00readme.txt",
+    "LICENSE.md",
+    "Makefile",
+    "README",
+    "README.md",
+    "ls-R",
 ])
 
 IGNORED_EXTENSIONS = set([
-    'fmt',
-    'log',
-    'lua',
-    'mf',
-    'pl',
-    'ps',
+    "fmt",
+    "log",
+    "lua",
+    "mf",
+    "pl",
+    "ps",
 ])
 
 
 class ZipMaker(object):
-    def __init__(self, bundle, zip):
-        self.bundle = bundle
+    def __init__(self, zip):
         self.zip = zip
         self.item_shas = {}
         self.final_hexdigest = None
@@ -209,17 +86,17 @@ class ZipMaker(object):
 
         self.ignored_tex_paths = set()
 
-        with open(bundle.path('ignored-tex-paths.txt')) as f:
+        with open("/bundle/ignored-tex-paths.txt", "r") as f:
             for line in f:
-                line = line.split('#')[0].strip()
+                line = line.split("#")[0].strip()
                 if len(line):
                     self.ignored_tex_paths.add(line)
 
         self.ignored_tex_path_prefixes = []
 
-        with open(bundle.path('ignored-tex-path-prefixes.txt')) as f:
+        with open("/bundle/ignored-tex-path-prefixes.txt", "r") as f:
             for line in f:
-                line = line.split('#')[0].strip()
+                line = line.split("#")[0].strip()
                 if len(line):
                     self.ignored_tex_path_prefixes.append(line)
 
@@ -234,7 +111,7 @@ class ZipMaker(object):
         if base_name in IGNORED_BASE_NAMES:
             return False
 
-        ext_bits = base_name.split('.', 1)
+        ext_bits = base_name.split(".", 1)
         if len(ext_bits) > 1 and ext_bits[1] in IGNORED_EXTENSIONS:
             return False
 
@@ -249,51 +126,7 @@ class ZipMaker(object):
 
 
     def _walk_onerr(self, oserror):
-        warn(f'error navigating installation tree: {oserror}')
-
-
-    # Preliminaries: extracting any patched files. This helps us maintain the
-    # vendor-pristine branch so that we can use Git's merging capabilities to
-    # maintain long-lived patches against them.
-    #
-    # This is kind of a hack since we're not actually touching any Zip file
-    # here!
-
-    def extract_vendor_pristine(self):
-        install_dir = self.bundle.install_path()
-
-        # Figure out what we need to check for.
-
-        patched_dir = self.bundle.path('patched')
-        patched_basenames = frozenset(os.listdir(patched_dir))
-
-        # Now walk the main tree, using the same logic as go(), but extracting
-        # only the patched files.
-
-        p = os.path.join(install_dir, 'texmf-dist')
-        n = len(p) + 1
-        done_basenames = set()
-        print(f'Scanning {cpath2qhpath(p)} ...')
-
-        for dirpath, _, filenames in os.walk(p, onerror=self._walk_onerr):
-            for fn in filenames:
-                if fn not in patched_basenames:
-                    continue
-
-                full = os.path.join(dirpath, fn)
-                tex = full[n:]
-                if not self.consider_file(tex, fn):
-                    continue
-
-                if fn in done_basenames:
-                    warn(f'duplicated patched file `{fn}`; sticking with the first instance')
-                    continue
-
-                vp = self.bundle.vendor_pristine_path(fn)
-                shutil.copy(full, vp)
-                done_basenames.add(fn)
-
-        print(f'Extracted {len(done_basenames)} files.')
+        warn(f"error navigating installation tree: {oserror}")
 
 
     # Actually building the full Zip
@@ -303,7 +136,7 @@ class ZipMaker(object):
 
         # Get the digest
 
-        with open(full_path, 'rb') as f:
+        with open(full_path, "rb") as f:
             contents = f.read()
 
         s = hashlib.sha256()
@@ -332,29 +165,22 @@ class ZipMaker(object):
 
 
     def go(self):
-        install_dir = self.bundle.install_path()
 
         # Add the extra files preloaded in the bundle
-
-        extras_dir = self.bundle.path('extras')
-
-        for name in os.listdir(extras_dir):
-            self.add_file(os.path.join(extras_dir, name))
+        for name in os.listdir("/bundle/extras"):
+            self.add_file(os.path.join("/bundle/extras", name))
 
         # Add the patched files, and make sure not to overwrite them later.
-
-        patched_dir = self.bundle.path('patched')
         patched_basenames = set()
-
-        for name in os.listdir(patched_dir):
-            self.add_file(os.path.join(patched_dir, name))
+        for name in os.listdir("/bundle/patched"):
+            self.add_file(os.path.join("/bundle/patched", name))
             patched_basenames.add(name)
 
         # Add the main tree.
 
-        p = os.path.join(install_dir, 'texmf-dist')
+        p = os.path.join("/install", "texmf-dist")
         n = len(p) + 1
-        print(f'Scanning {cpath2qhpath(p)} ...')
+        print(f"Scanning {p} ...")
 
         for dirpath, _, filenames in os.walk(p, onerror=self._walk_onerr):
             for fn in filenames:
@@ -368,37 +194,37 @@ class ZipMaker(object):
 
         # Compute a hash of it all.
 
-        print('Computing final hash ...')
+        print("Computing final hash ...")
         s = hashlib.sha256()
-        s.update(struct.pack('>I', len(self.item_shas)))
-        s.update(b'\0')
+        s.update(struct.pack(">I", len(self.item_shas)))
+        s.update(b"\0")
 
         for name in sorted(self.item_shas.keys()):
-            s.update(name.encode('utf8'))
-            s.update(b'\0')
+            s.update(name.encode("utf8"))
+            s.update(b"\0")
             s.update(self.item_shas[name][0])
 
         self.final_hexdigest = s.hexdigest()
-        self.zip.writestr('SHA256SUM', self.final_hexdigest)
+        self.zip.writestr("SHA256SUM", self.final_hexdigest)
 
         # Report clashes if needed
 
         if len(self.clashes):
-            warn(f'{len(self.clashes)} clashing basenames were observed')
+            warn(f"{len(self.clashes)} clashing basenames were observed")
 
-            report_path = self.bundle.output_path('clash-report.txt')
-            warn(f'logging clash report to {cpath2qhpath(report_path)}')
+            report_path = "/output/clash-report.txt"
+            warn(f"logging clash report to {report_path}")
 
-            with open(report_path, 'wt') as f:
+            with open(report_path, "wt") as f:
                 for base in sorted(self.clashes.keys()):
-                    print(f'{base}:', file=f)
+                    print(f"{base}:", file=f)
                     bydigest = self.clashes[base]
 
                     for digest in sorted(bydigest.keys()):
-                        print(f'  {digest.hex()[:8]}:', file=f)
+                        print(f"  {digest.hex()[:8]}:", file=f)
 
                         for full in sorted(bydigest[digest]):
-                            print(f'     {full[n:]}', file=f)
+                            print(f"     {full[n:]}", file=f)
 
             chown_host(report_path)
 
