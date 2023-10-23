@@ -11,7 +11,6 @@ RUN apt-get update && \
 		libfontconfig1 \
 		git-core \
 		python3 \
-		python3-toml \
 		wget \
 	&& \
 	rm -rf /var/lib/apt/lists/*
