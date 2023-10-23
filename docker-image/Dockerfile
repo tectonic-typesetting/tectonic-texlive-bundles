@@ -6,15 +6,15 @@ VOLUME /build/
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && \
-    apt-get install -yq --no-install-recommends \
-        libdigest-perl-md5-perl \
-        libfontconfig1 \
-        git-core \
-        python3 \
-        python3-toml \
-        wget \
-    && \
-    rm -rf /var/lib/apt/lists/*
+	apt-get install -yq --no-install-recommends \
+		libdigest-perl-md5-perl \
+		libfontconfig1 \
+		git-core \
+		python3 \
+		python3-toml \
+		wget \
+	&& \
+	rm -rf /var/lib/apt/lists/*
 
 
 COPY --chmod=770 entrypoint.sh /

@@ -45,7 +45,7 @@ if [[
 	"${job}" == "" ||
 	! "$job" =~ ^(all|shell|bash|image|install|zip|itar)$
 ]] ; then
-   help
+	help
 fi
 
 
