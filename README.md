@@ -25,7 +25,7 @@ Output files consist of the following:
 ## Bundles:
 The following bundles are available:
  - `full`: all of TeXlive, plus a few patches. Currently broken.\
- Uses `texlive-2023.0r0`.
+ Uses `texlive-2022.0r0`.
 
  - `unpatched`: like `full`, but with no patches. Should work well.\
  Uses `texlive-2023.0r0`.
