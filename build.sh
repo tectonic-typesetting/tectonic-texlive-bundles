@@ -162,7 +162,7 @@ if [[ "${job}" == "all" || "${job}" == "zip" ]]; then
 		echo "[WARNING] Output directory isn't empty, deleting in 1 second..."
 		sleep 1
 
-		rm -rf "${output_dir}"
+		rm -f "${output_dir}/*"
 	fi
 
 	docker run -it --rm "${docker_args[@]}" $image_name makezip
