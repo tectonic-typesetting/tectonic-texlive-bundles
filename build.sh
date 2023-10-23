@@ -76,7 +76,7 @@ zip_path="${output_dir}/${bundle_name}.zip"
 mkdir -p "${install_dir}"
 mkdir -p "${output_dir}"
 
-if [ -d $iso_dir ]; then 
+if [ ! -d $iso_dir ]; then 
 	echo >&2 "[ERROR] Cannot start: no directory ${iso_dir}"
 	exit 1
 fi
