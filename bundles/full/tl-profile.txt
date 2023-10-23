@@ -1,4 +1,4 @@
-selected_scheme scheme-minimal
+selected_scheme scheme-full
 TEXDIR @dest@
 TEXMFSYSCONFIG @dest@/texmf-dist
 TEXMFSYSVAR @dest@/texmf-dist
@@ -6,7 +6,6 @@ TEXMFLOCAL @dest@/texmf-local
 TEXMFHOME @dest@/texmf-home
 TEXMFCONFIG @dest@/texmf-config
 TEXMFVAR @dest@/texmf-var
-collection-basic 1
 option_adjustrepo 1
 option_autobackup 0
 option_desktop_integration 0
