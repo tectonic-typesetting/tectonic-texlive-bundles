@@ -20,16 +20,20 @@ function install () {
 }
 
 
+# Make a zip bundle using an existing installation
+function makezip () {
+	exec python3 "/scripts/make-zipfile.py"
+	chown $HOSTUID:$HOSTGID -R "/output"
+}
+
 
 command="$1"
 shift
 
-if [ "$command" = bash ] ; then
-	exec bash "$@"
-elif [ "$command" = python ] ; then
-	exec python3 "$@"
-elif [ "$command" = install ] ; then
+if [ "$command" = install ] ; then
 	install
+elif [ "$command" = makezip ] ; then
+	makezip
 else
 	echo "$0: unrecognized command \"$command\"."
 	exit 1
