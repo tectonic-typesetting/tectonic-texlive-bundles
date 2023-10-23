@@ -7,6 +7,10 @@ build_dir="$(pwd)/build"
 iso_dir="$(pwd)/build/iso"
 bundle_name="${1}"
 shift
+job="${1}"
+shift
+
+
 
 
 function die () {
@@ -14,18 +18,52 @@ function die () {
     exit 1
 }
 
-bundle_dir="$(cd "bundles/${bundle_name}" && pwd)"
-if [ ! -f "$bundle_dir/bundle.sh" ] ; then
-    die "bundle directory \`$bundle_dir\` looks invalid (no bundle.sh)"
+
+function help () {
+    cat << EOF
+
+Usage: ./build.sh <bundle> <job>
+
+Where <bundle> is a subpath of ./bundles
+and <job> is one of the following:
+    - shell: run a debug shell
+    - all: run the following, in order
+
+    - image: build docker image
+    - install: install texlive
+    - zip: create zip bundle
+    - itar: create itar bundle
+Each of the last four commands requires the previous.
+
+EOF
+
+    exit 0
+}
+
+if [[
+    "${bundle_name}" == "" ||
+    "${job}" == "" ||
+    ! "$job" =~ ^(all|shell|bash|image|install|zip|itar)$
+]] ; then
+   help
 fi
 
-# Load bundle metadata
-source "${bundle_dir}/bundle.sh"
 
+# Check bundle path
+bundle_dir="$(realpath "bundles/${bundle_name}")"
+if [ ! -f "$bundle_dir/bundle.sh" ] ; then
+    die "Bundle directory \`$bundle_dir\` looks invalid (no bundle.sh)"
+fi
+
+
+# Load and check bundle metadata
+source "${bundle_dir}/bundle.sh"
 if [ "${bundle_name}" != "${bn_name}" ] ; then
     die "[ERROR] Bundle name does not match folder name. Fix bundles/${bundle_name}/bundle.sh"
 fi
 
+
+[ -d $build_dir/iso ] || die "no such directory $build_dir/iso"
 docker_args=(
     -e HOSTUID=$(id -u)
     -e HOSTGID=$(id -g)
@@ -61,29 +99,28 @@ function check_hash () {
 
 
 
-
-
-# Replaces ./driver.sh build-image
-
-if true; then
-    tag=$(date +%Y%m%d)
-    docker build -t $image_name:$tag docker-image/
-    docker tag $image_name:$tag $image_name:latest
-fi
-
-
-if [[ "$1" == "shell" || "$1" == "bash" ]]; then 
+if [[ "${job}" == "shell" || "${job}" == "bash"]]; then
     docker run -it --rm "${docker_args[@]}" $image_name bash
     exit 0
 fi
 
 
 
+
+# Replaces ./driver.sh build-image
+if [[ "${job}" == "all" || "${job}" == "image"]]; then
+    tag=$(date +%Y%m%d)
+    docker build -t $image_name:$tag docker-image/
+    docker tag $image_name:$tag $image_name:latest
+fi
+
+
+
+
+
 # We're building from an iso, so we skip ./driver.sh update-containers.
 # Replaces ./driver.sh make-installation bundles/tlextras
-
-if true; then
-    [ -d $build_dir/iso ] || die "no such directory $build_dir/iso"
+if [[ "${job}" == "all" || "${job}" == "install"]]; then
     docker run -it --rm "${docker_args[@]}" $image_name install "/build/installs"
 fi
 
@@ -94,8 +131,7 @@ fi
 
 # Skip ./driver.sh install-packages bundles/tlextras, since tl-install should do everything for us.
 # Replaces ./driver.sh make-zipfile bundles/tlextras
-
-if true; then
+if [[ "${job}" == "all" || "${job}" == "zip"]]; then
     docker run -it --rm "${docker_args[@]}" $image_name python /scripts/make-zipfile.py
 fi
 
@@ -104,8 +140,7 @@ fi
 
 
 # Replaces ./driver.sh make-itar bundles/tlextras
-
-if true; then
+if [[ "${job}" == "all" || "${job}" == "itar"]]; then
     ziprel="$(docker run --rm "${docker_args[@]}" $image_name python /scripts/misc.py zip-relpath)"
     dir=$(cd $(dirname "$ziprel") && pwd)
     zipfull=$dir/$(basename "$ziprel")
