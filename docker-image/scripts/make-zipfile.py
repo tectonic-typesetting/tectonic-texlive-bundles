@@ -1,13 +1,11 @@
 # -*- mode: python; coding: utf-8 -*-
 
 """
-This script is meant to be run inside the TeXLive bundler Docker container.
-
-Create a Zip file containing all of the resources from a TeXLive
-installation.
+This script should be run inside the TeXLive bundler Docker container.
+Creates a Zip file containing all of the resources of a TeXLive installation.
 """
 
-import argparse
+
 import sys
 import os
 import zipfile
@@ -21,8 +19,7 @@ NAME = os.environ["bundle_name"]
 
 # Input paths
 PATH_ignore  = Path("/bundle/ignore")
-PATH_extras  = Path("/bundle/extras")
-PATH_patched = Path("/bundle/patched")
+PATH_extra   = Path("/bundle/include")
 PATH_texlive = Path("/install/texmf-dist")
 
 # Output paths
@@ -34,8 +31,8 @@ PATH_listing = Path(f"/output/{NAME}.listing.txt")
 
 
 class ZipMaker(object):
-    def __init__(self, zip):
-        self.zip = zip
+    def __init__(self, zipfile):
+        self.zipfile = zipfile
         self.item_shas = {}
         self.final_hexdigest = None
 
@@ -44,7 +41,6 @@ class ZipMaker(object):
         #       b"digest": Path(fullpath)
         # }}
         self.clashes = {}
-
 
         # Load ignore patterns
         self.ignore_patterns = set()
@@ -83,7 +79,7 @@ class ZipMaker(object):
         prev_tuple = self.item_shas.get(full_path.name)
         if prev_tuple is None:
             # This is a new file, ok for now.
-            self.zip.writestr(full_path.name, contents)
+            self.zipfile.writestr(full_path.name, contents)
             self.item_shas[full_path.name] = (digest, full_path)
         elif prev_tuple[0] != digest:
             # We already have a file with this name and different contents
@@ -101,49 +97,57 @@ class ZipMaker(object):
 
 
     def go(self):
-        # Add the extra files preloaded in the bundle
-        for f in PATH_extras.iterdir():
-            self.add_file(f)
 
-        # Add the patched files, and make sure not to overwrite them later.
-        patched_basenames = set()
-        for f in PATH_patched.iterdir():
-            self.add_file(f)
-            patched_basenames.add(f.name)
+        # Statistics for summary
+        extra_count = 0 # Extra files added
+        extra_conflict_count = 0 # Number of conflicting extra files (0, ideally)
+        texlive_count = 0 # Number of files from texlive
+        ignored_count = 0 # Number of texlive files ignored
+        replaced_count = 0 # Number of texlive files replaced with extra files
+
+        # Add extra files
+        extra_basenames = set()
+        if PATH_extra.is_dir():
+            for f in PATH_extra.rglob("*"):
+                if not f.is_file():
+                    continue
+                if f.name in extra_basenames:
+                    print(f"Warning: extra file {f.name} has conflicts, ignoring")
+                    extra_conflict_count += 1
+                    continue
+                self.add_file(f)
+                extra_count += 1
+                extra_basenames.add(f.name)
 
         # Add the main tree.
-        ignored = 0
         print(f"Zipping {PATH_texlive}...")
         for f in PATH_texlive.rglob("*"):
             if not f.is_file():
                 continue
-            if f.name in patched_basenames:
+            if f.name in extra_basenames:
+                print(f"Warning: ignoring {f.name}, our bundle provides an alternative")
+                replaced_count += 1
                 continue
 
             if self.consider_file(f):
+                texlive_count += 1
                 self.add_file(f)
             else:
-                ignored += 1
+                ignored_count += 1
 
-        print(f"Done, ignored {ignored} files.")
+        print("")
+        print("Done. Summary is below.")
+        print(f"\textra file conflicts: {extra_conflict_count}")
+        print(f"\ttl files ignored:     {ignored_count}")
+        print(f"\ttl files replaced:    {replaced_count}")
+        print( "\t==============================")
+        print(f"\textra files added:    {extra_count}")
+        print(f"\ttotal files added:    {texlive_count+extra_count}")
+        print("\n")
 
-        # Compute a hash of it all.
-        print("Computing final hash ...")
-        s = hashlib.sha256()
-        s.update(struct.pack(">I", len(self.item_shas)))
-        s.update(b"\0")
 
-        for name in sorted(self.item_shas.keys()):
-            s.update(name.encode("utf8"))
-            s.update(b"\0")
-            s.update(self.item_shas[name][0])
-
-        self.final_hexdigest = s.hexdigest()
-        self.zip.writestr("SHA256SUM", self.final_hexdigest)
-
-        # Report clashes if needed
         if len(self.clashes):
-            print(f"WARNING: {len(self.clashes)} file clashes were found.")
+            print(f"Warning: {len(self.clashes)} file clashes were found.")
             print(f"Logging clash report to {PATH_clash}")
 
             with PATH_clash.open("w") as f:
@@ -159,27 +163,36 @@ class ZipMaker(object):
                     f.write("\n\n")
 
 
+        print("Computing final hash ...")
+        s = hashlib.sha256()
+        s.update(struct.pack(">I", len(self.item_shas)))
+        s.update(b"\0")
+
+        for name in sorted(self.item_shas.keys()):
+            s.update(name.encode("utf8"))
+            s.update(b"\0")
+            s.update(self.item_shas[name][0])
+
+        self.final_hexdigest = s.hexdigest()
+        self.zipfile.writestr("SHA256SUM", self.final_hexdigest)
+
+
     def write_listing(self, file):
         for base in sorted(self.item_shas.keys()):
             file.write(base+"\n")
 
 
-def make_arg_parser():
-    p = argparse.ArgumentParser(
-        description = __doc__,
-    )
-    return p
+
 
 
 def entrypoint(argv):
-    settings = make_arg_parser().parse_args(argv[1:])
     paths = []
 
     try:
         paths.append(PATH_zip)
 
-        with zipfile.ZipFile(PATH_zip, "w", zipfile.ZIP_DEFLATED, True) as zip:
-            b = ZipMaker(zip)
+        with zipfile.ZipFile(PATH_zip, "w", zipfile.ZIP_DEFLATED, True) as zipfile:
+            b = ZipMaker(zipfile)
             b.go()
 
         print("Final SHA256SUM:", b.final_hexdigest)
