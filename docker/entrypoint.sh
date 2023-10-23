@@ -3,6 +3,14 @@
 
 function check_iso_hash () {
 	source /bundle/bundle.sh
+
+	if [[ "${bundle_texlive_hash}" == "" ]]; then
+		echo "Not checking hash, bundle doesn't provide one."
+		echo "Continuing..."
+		sleep 2
+		exit 0
+	fi
+
 	echo "Checking iso hash against bundles/${bundle_name}..."
 
 	hash=$( sha256sum -b "/iso.img" | awk '{ print $1 }' )
@@ -35,12 +43,14 @@ function install () {
 	echo "Logs are streamed to build/install/${bundle_name}/tl-install.log"
 
 	cd /iso-mount
+	rm -f "/install/tl-install.log"
 	./install-tl -profile "${profile}" > "/install/tl-install.log"
-	result=$?
+	result="$?"
 
 	echo "Done, cleaning up..."
 
 	# Cleanup
+	cd /
 	umount /iso-mount
 	rm -d /iso-mount
 	rm "${profile}"
