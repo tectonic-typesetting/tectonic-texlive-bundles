@@ -132,10 +132,10 @@ if [[ "${job}" == "shell" || "${job}" == "bash" ]]; then
 	exit 0
 fi
 
-# Build the docker container in ./docker-image
+# Build the docker container in ./docker
 if [[ "${job}" == "all" || "${job}" == "container" ]]; then
 	tag=$(date +%Y%m%d)
-	docker build -t $image_name:$tag docker-image/
+	docker build -t $image_name:$tag docker/
 	docker tag $image_name:$tag $image_name:latest
 fi
 
