@@ -22,6 +22,7 @@ and <job> is one of the following:
 
 	- container: build docker image
 	- install: install texlive
+	- forceinstall: install texlive, but don't check for an installation
 	- zip: create zip bundle
 	- itar: create itar bundle
 These four commands produce a complete build.
@@ -44,7 +45,7 @@ function relative() {
 if [[
 	"${target_bundle}" == "" ||
 	"${job}" == "" ||
-	! "$job" =~ ^(all|shell|bash|container|install|zip|itar)$
+	! "$job" =~ ^(all|shell|bash|container|install|forceinstall|zip|itar)$
 ]] ; then
 	help
 fi
@@ -139,14 +140,15 @@ if [[ "${job}" == "all" || "${job}" == "container" ]]; then
 fi
 
 # Install texlive in /build/install using our container
-if [[ "${job}" == "all" || "${job}" == "install" ]]; then
+if [[ "${job}" == "all" || "${job}" == "install" || "${job}" == "forceinstall" ]]; then
 
-	if [ ! -z "$(ls -A "${install_dir}")" ]; then
+	if [[ ! -z "$(ls -A "${install_dir}")" && "${job}" != "forceinstall" ]]; then
+		echo ""
 		echo >&2 "[ERROR] Installation directory isn't empty, exiting."
+		echo >&2 "Remove it manually or run \`./build.sh forceinstall\` to continue."
 		echo >&2 "Installation is at $(relative "${install_dir}")"
 		exit 1
 	fi
-
 
 	docker run -it --rm "${docker_args[@]}" $image_name install
 fi
@@ -166,7 +168,7 @@ if [[ "${job}" == "all" || "${job}" == "zip" ]]; then
 		rm -f "${output_dir}/*"
 	fi
 
-	docker run -it --rm "${docker_args[@]}" $image_name makezip
+	docker run -it --rm "${docker_args[@]}" $image_name makezip "$bundle_name"
 fi
 
 # Convert zip bundle to an indexed tar bundle

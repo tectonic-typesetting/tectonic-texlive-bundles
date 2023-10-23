@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 # Bundle parameters
-NAME = os.environ["bundle_name"]
+BUNDLE = sys.argv[1]
 
 # Input paths
 PATH_ignore  = Path("/bundle/ignore")
@@ -24,9 +24,9 @@ PATH_texlive = Path("/install/texmf-dist")
 
 # Output paths
 PATH_clash   = Path("/output/clash-report.txt")
-PATH_zip     = Path(f"/output/{NAME}.zip")
-PATH_hash    = Path(f"/output/{NAME}.sha256sum")
-PATH_listing = Path(f"/output/{NAME}.listing.txt")
+PATH_zip     = Path(f"/output/{BUNDLE}.zip")
+PATH_hash    = Path(f"/output/{BUNDLE}.sha256sum")
+PATH_listing = Path(f"/output/{BUNDLE}.listing.txt")
 
 
 
@@ -184,8 +184,7 @@ class ZipMaker(object):
 
 
 
-
-def entrypoint(argv):
+if __name__ == "__main__":
     paths = []
 
     try:
@@ -214,7 +213,3 @@ def entrypoint(argv):
         except:
             pass
         raise e
-
-
-if __name__ == "__main__":
-    sys.exit(entrypoint(sys.argv))
