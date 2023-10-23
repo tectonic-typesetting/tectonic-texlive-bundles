@@ -1,19 +1,42 @@
 #!/usr/bin/env bash
 
 
+function check_iso_hash () {
+	source /bundle/bundle.sh
+	echo "Checking iso hash against bundles/${bundle_name}..."
+
+	hash=$( sha256sum -b "/iso.img" | awk '{ print $1 }' )
+
+	if [[ "${hash}" == "${bundle_texlive_hash}" ]]; then
+		echo "OK: hash matches."
+	else
+		echo "Error: checksums do not match:"
+		echo "Got      $hash"
+		echo "Expected $bundle_texlive_hash"
+		exit 1
+	fi
+}
+
 # Install texlive into $1.
 # Should be an absolute path.
 function install () {
 	source /bundle/bundle.sh
+
+	mkdir /iso-mount
+	mount /iso.img /iso-mount
 
 	# Load profile and update destination paths
 	profile=$(mktemp)
 	sed -e "s|@dest@|/install|g" /bundle/tl-profile.txt > "${profile}"
 
 	# Install texlive
-	cd /iso
-	./install-tl -profile "${profile}" | tee "/install/tl-install.log"
+	echo "Installing TeXlive, this may take a while..."
+	echo "Logs are streamed to tl-install.log"
+	cd /iso-mount
+	./install-tl -profile "${profile}" > "/install/tl-install.log"
 	result=$?
+
+	echo "Done, cleaning up..."
 
 	# Cleanup
 	rm "${profile}"
@@ -37,7 +60,9 @@ function makezip () {
 command="$1"
 shift
 
-if [ "$command" = install ] ; then
+if [ "$command" = check_iso_hash ] ; then
+	check_iso_hash
+elif [ "$command" = install ] ; then
 	install
 elif [ "$command" = makezip ] ; then
 	makezip $@

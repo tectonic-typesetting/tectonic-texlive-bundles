@@ -2,31 +2,36 @@
 
 image_name="rework-bundler"
 build_dir="$(pwd)/build"
-iso_dir="$(pwd)/build/iso"
 
 target_bundle="${1#"bundles/"}" # Remove optional "bundles/" prefix
 shift
 job="${1}"
 shift
-
+iso_name="${1}"
+iso_file="$(realpath "${iso_name}")"
+shift
 
 function help () {
 	cat << EOF
 
-Usage: ./build.sh <bundle> <job>
+Usage: ./build.sh <bundle> <job> <iso>
 
-Where <bundle> is a subpath of ./bundles
-and <job> is one of the following:
+Where <bundle> is a subpath of ./bundles,
+<job> is one of the following:
+<iso> is a TeXlive dvd image.
+
+Jobs:
 	- shell: run a debug shell
 	- all: run complete build process.
 
 	- container: build docker image
-	- install: install texlive
-	- forceinstall: install texlive, but don't check for an installation
-	- zip: create zip bundle
-	- itar: create itar bundle
-These four commands produce a complete build.
-Each requires results the previous command.
+	- install: install texlive in docker
+	- forceinstall: install texlive, but don't check hash
+	- zip: create a zip bundle
+	- itar: create an itar bundle
+
+container, install, zip, and itar produce a complete build.
+Each requires results from the previous command.
 
 EOF
 
@@ -39,12 +44,23 @@ function relative() {
 
 
 
+# Build the docker container in ./docker
+if [[ "${job}" == "all" || "${job}" == "container" ]]; then
+	tag=$(date +%Y%m%d)
+	docker build -t $image_name:$tag docker/
+	docker tag $image_name:$tag $image_name:latest
+
+	if [[ "${job}" == "container" ]]; then
+		exit 0
+	fi
+fi
 
 
-# Make sure $job is valid
+# Make sure $args are valid
 if [[
 	"${target_bundle}" == "" ||
 	"${job}" == "" ||
+	"${iso_name}" == "" ||
 	! "$job" =~ ^(all|shell|bash|container|install|forceinstall|zip|itar)$
 ]] ; then
 	help
@@ -86,13 +102,17 @@ if [ ! -d $iso_dir ]; then
 	exit 1
 fi
 
+# docker arguments.
+# We mount an iso inside the container, so we need
+# to be privileged.
 docker_args=(
+	--privileged
 	-e HOSTUID=$(id -u)
 	-e HOSTGID=$(id -g)
 	-e bundle_name="${bundle_name}"
 	-e bundle_texlive_version="${bundle_texlive_version}"
 	-e bundle_texlive_hash="${bundle_texlive_hash}"
-	-v "$iso_dir":/iso:ro,z
+	-v "$iso_file":/iso.img:ro,z
 	-v "$install_dir":/install:rw,z
 	-v "$output_dir":/output:rw,z
 	-v "$bundle_dir":/bundle:ro,z
@@ -100,24 +120,6 @@ docker_args=(
 
 
 
-
-
-
-function check_hash () {
-	bundle_name="${1}"
-	file_name="${2}"
-	source "bundles/${bundle_name}/bundle.sh"
-
-	echo "Checking ${file_name} against bundles/${bundle_name}..."
-
-	hash=$( sha256sum -b "${file_name}" | awk '{ print $1 }' )
-
-	if [[ "${hash}" == "${bn_texlive_hash}" ]]; then
-		echo "OK: hash matches."
-	else
-		echo "ERR: checksum does not match."
-	fi
-}
 
 
 
@@ -132,25 +134,36 @@ if [[ "${job}" == "shell" || "${job}" == "bash" ]]; then
 	exit 0
 fi
 
-# Build the docker container in ./docker
-if [[ "${job}" == "all" || "${job}" == "container" ]]; then
-	tag=$(date +%Y%m%d)
-	docker build -t $image_name:$tag docker/
-	docker tag $image_name:$tag $image_name:latest
-fi
 
 # Install texlive in /build/install using our container
 if [[ "${job}" == "all" || "${job}" == "install" || "${job}" == "forceinstall" ]]; then
 
-	if [[ ! -z "$(ls -A "${install_dir}")" && "${job}" != "forceinstall" ]]; then
+
+	if [[ ! -z "$(ls -A "${install_dir}")" ]]; then
+		echo "Install directory is $(relative "${install_dir}")"
+		for i in {5..2}; do
+			echo "[WARNING] Install directory isn't empty, deleting in $i seconds..."
+			sleep 1
+		done
+		echo "[WARNING] Install directory isn't empty, deleting in 1 second..."
+		sleep 1
+
+		rm -drf "${install_dir}/*"
+		echo "Ran \`rm -drf "${install_dir}/*"\`"
 		echo ""
-		echo >&2 "[ERROR] Installation directory isn't empty, exiting."
-		echo >&2 "Remove it manually or run \`./build.sh forceinstall\` to continue."
-		echo >&2 "Installation is at $(relative "${install_dir}")"
-		exit 1
+	fi
+	
+	# Check texlive hash
+	if [[ "${job}" != "forceinstall" ]]; then
+		docker run -it --rm "${docker_args[@]}" $image_name check_iso_hash
+		if [[ $? != 0 ]]; then
+			exit 1
+		fi
+		echo ""
 	fi
 
 	docker run -it --rm "${docker_args[@]}" $image_name install
+	echo ""
 fi
 
 # Make a zip bundle from a texlive installation
@@ -166,9 +179,12 @@ if [[ "${job}" == "all" || "${job}" == "zip" ]]; then
 		sleep 1
 
 		rm -f "${output_dir}/*"
+		echo "Ran \`rm -f "${output_dir}/*"\`"
+		echo ""
 	fi
 
 	docker run -it --rm "${docker_args[@]}" $image_name makezip "$bundle_name"
+	echo ""
 fi
 
 # Convert zip bundle to an indexed tar bundle
@@ -179,4 +195,5 @@ if [[ "${job}" == "all" || "${job}" == "itar" ]]; then
 	echo "Generating $(relative "${all_dir}")..."
 	cd $(dirname $0)/zip2tarindex
 	exec cargo run --release -- "$zip_path" "$tar_path"
+	echo ""
 fi
