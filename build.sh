@@ -32,8 +32,8 @@ EOF
 	exit 0
 }
 
-function relpath() {
-	echo "$(realpath --relative-to="$(pwd)" "${1}")"
+function relative() {
+	echo "./$(realpath --relative-to="$(pwd)" "${1}")"
 }
 
 
@@ -53,7 +53,7 @@ fi
 # Load and check bundle metadata
 bundle_dir="$(realpath "bundles/${target_bundle}")"
 if [ ! -f "$bundle_dir/bundle.sh" ] ; then
-	echo >&2 "[ERROR] $(relpath "${bundle_dir}") has no bundle.sh, cannot proceed."
+	echo >&2 "[ERROR] $(relative "${bundle_dir}") has no bundle.sh, cannot proceed."
 	exit 1
 fi
 source "${bundle_dir}/bundle.sh"
@@ -81,7 +81,7 @@ mkdir -p "${install_dir}"
 mkdir -p "${output_dir}"
 
 if [ ! -d $iso_dir ]; then 
-	echo >&2 "[ERROR] Cannot start: no directory $(relpath "${iso_dir}")"
+	echo >&2 "[ERROR] Cannot start: no directory $(relative "${iso_dir}")"
 	exit 1
 fi
 
@@ -143,7 +143,7 @@ if [[ "${job}" == "all" || "${job}" == "install" ]]; then
 
 	if [ ! -z "$(ls -A "${install_dir}")" ]; then
 		echo >&2 "[ERROR] Installation directory isn't empty, exiting."
-		echo >&2 "Installation is at $(relpath "${install_dir}")"
+		echo >&2 "Installation is at $(relative "${install_dir}")"
 		exit 1
 	fi
 
@@ -155,10 +155,11 @@ fi
 if [[ "${job}" == "all" || "${job}" == "zip" ]]; then
 
 	if [ ! -z "$(ls -A "${output_dir}")" ]; then
-		echo "[WARNING] Output directory isn't empty, deleting in 3 seconds..."
-		sleep 1
-		echo "[WARNING] Output directory isn't empty, deleting in 2 seconds..."
-		sleep 1
+		echo "Output directory is $(relative "${output_dir}")"
+		for i in {5..2}; do
+			echo "[WARNING] Output directory isn't empty, deleting in $i seconds..."
+			sleep 1
+		done
 		echo "[WARNING] Output directory isn't empty, deleting in 1 second..."
 		sleep 1
 
@@ -173,7 +174,7 @@ if [[ "${job}" == "all" || "${job}" == "itar" ]]; then
 	tar_path="${output_dir}/$(basename "$zip_path" .zip).tar"
 	rm -f "$tar_path"
 
-	echo "Generating $(relpath "${all_dir}")..."
+	echo "Generating $(relative "${all_dir}")..."
 	cd $(dirname $0)/zip2tarindex
 	exec cargo run --release -- "$zip_path" "$tar_path"
 fi
