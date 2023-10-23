@@ -10,14 +10,6 @@ job="${1}"
 shift
 
 
-
-
-function die () {
-	echo >&2 "error:" "$@"
-	exit 1
-}
-
-
 function help () {
 	cat << EOF
 
@@ -26,13 +18,14 @@ Usage: ./build.sh <bundle> <job>
 Where <bundle> is a subpath of ./bundles
 and <job> is one of the following:
 	- shell: run a debug shell
-	- all: run the following, in order
+	- all: run complete build process.
 
 	- container: build docker image
 	- install: install texlive
 	- zip: create zip bundle
 	- itar: create itar bundle
-Each of the last four commands requires the previous.
+These four commands produce a complete build.
+Each requires results the previous command.
 
 EOF
 
@@ -56,7 +49,8 @@ fi
 # Load and check bundle metadata
 bundle_dir="$(realpath "bundles/${target_bundle}")"
 if [ ! -f "$bundle_dir/bundle.sh" ] ; then
-	die "[ERROR] \`$bundle_dir\` has no bundle.sh, cannot proceed."
+	echo >&2 "[ERROR] \`$bundle_dir\` has no bundle.sh, cannot proceed."
+	exit 1
 fi
 source "${bundle_dir}/bundle.sh"
 if [[
@@ -64,9 +58,11 @@ if [[
 	-z ${bundle_texlive_file+x} ||
 	-z ${bundle_texlive_hash+x}
 ]] ; then
-	die "[ERROR] Bundle config is missing values, check bundle.sh"
+	echo >&2 "[ERROR] Bundle config is missing values, check bundle.sh"
+	exit 1
 elif [ "${target_bundle}" != "${bundle_name}" ] ; then
-	die "[ERROR] \$bundle_name does not match folder name."
+	echo >&2 "[ERROR] \$bundle_name does not match folder name."
+	exit 1
 fi
 unset target_bundle
 
@@ -80,7 +76,11 @@ zip_path="${output_dir}/${bundle_name}.zip"
 mkdir -p "${install_dir}"
 mkdir -p "${output_dir}"
 
-[ -d $build_dir/iso ] || die "no such directory ${build_dir}/iso"
+if [ -d $iso_dir ]; then 
+	echo >&2 "[ERROR] Cannot start: no directory ${iso_dir}"
+	exit 1
+fi
+
 docker_args=(
 	-e HOSTUID=$(id -u)
 	-e HOSTGID=$(id -g)
