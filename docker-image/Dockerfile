@@ -2,7 +2,8 @@ FROM ubuntu:20.04
 
 VOLUME /iso/
 VOLUME /bundle/
-VOLUME /build/
+VOLUME /install/
+VOLUME /output/
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && \

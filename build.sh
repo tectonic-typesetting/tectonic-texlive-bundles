@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Copyright 2016-2022 the Tectonic Project.
-# Licensed under the MIT License.
 
 image_name="rework-bundler"
 build_dir="$(pwd)/build"
@@ -29,7 +27,7 @@ and <job> is one of the following:
 	- shell: run a debug shell
 	- all: run the following, in order
 
-	- image: build docker image
+	- container: build docker image
 	- install: install texlive
 	- zip: create zip bundle
 	- itar: create itar bundle
@@ -43,7 +41,7 @@ EOF
 if [[
 	"${bundle_name}" == "" ||
 	"${job}" == "" ||
-	! "$job" =~ ^(all|shell|bash|image|install|zip|itar)$
+	! "$job" =~ ^(all|shell|bash|container|install|zip|itar)$
 ]] ; then
 	help
 fi
@@ -62,8 +60,13 @@ if [ "${bundle_name}" != "${bn_name}" ] ; then
 	die "[ERROR] Bundle name does not match folder name. Fix bundles/${bundle_name}/bundle.sh"
 fi
 
+install_dir="${build_dir}/install/${bn_name}-${bn_texlive_version}"
+output_dir="${build_dir}/output/${bn_name}-${bn_texlive_version}"
 
-[ -d $build_dir/iso ] || die "no such directory $build_dir/iso"
+mkdir -p "${install_dir}"
+mkdir -p "${output_dir}"
+
+[ -d $build_dir/iso ] || die "no such directory ${build_dir}/iso"
 docker_args=(
 	-e HOSTUID=$(id -u)
 	-e HOSTGID=$(id -g)
@@ -71,7 +74,8 @@ docker_args=(
 	-e bn_texlive_version="${bn_texlive_version}"
 	-e bn_texlive_hash="${bn_texlive_hash}"
 	-v "$iso_dir":/iso:ro,z
-	-v "$build_dir":/build:rw,z
+	-v "$install_dir":/install:rw,z
+	-v "$output_dir":/output:rw,z
 	-v "$bundle_dir":/bundle:ro,z
 )
 
@@ -99,7 +103,7 @@ function check_hash () {
 
 
 
-if [[ "${job}" == "shell" || "${job}" == "bash"]]; then
+if [[ "${job}" == "shell" || "${job}" == "bash" ]]; then
 	docker run -it --rm "${docker_args[@]}" $image_name bash
 	exit 0
 fi
@@ -108,7 +112,7 @@ fi
 
 
 # Replaces ./driver.sh build-image
-if [[ "${job}" == "all" || "${job}" == "image"]]; then
+if [[ "${job}" == "all" || "${job}" == "container" ]]; then
 	tag=$(date +%Y%m%d)
 	docker build -t $image_name:$tag docker-image/
 	docker tag $image_name:$tag $image_name:latest
@@ -120,8 +124,8 @@ fi
 
 # We're building from an iso, so we skip ./driver.sh update-containers.
 # Replaces ./driver.sh make-installation bundles/tlextras
-if [[ "${job}" == "all" || "${job}" == "install"]]; then
-	docker run -it --rm "${docker_args[@]}" $image_name install "/build/installs"
+if [[ "${job}" == "all" || "${job}" == "install" ]]; then
+	docker run -it --rm "${docker_args[@]}" $image_name install
 fi
 
 
@@ -131,7 +135,7 @@ fi
 
 # Skip ./driver.sh install-packages bundles/tlextras, since tl-install should do everything for us.
 # Replaces ./driver.sh make-zipfile bundles/tlextras
-if [[ "${job}" == "all" || "${job}" == "zip"]]; then
+if [[ "${job}" == "all" || "${job}" == "zip" ]]; then
 	docker run -it --rm "${docker_args[@]}" $image_name python /scripts/make-zipfile.py
 fi
 
@@ -140,8 +144,8 @@ fi
 
 
 # Replaces ./driver.sh make-itar bundles/tlextras
-if [[ "${job}" == "all" || "${job}" == "itar"]]; then
-	ziprel="$(docker run --rm "${docker_args[@]}" $image_name python /scripts/misc.py zip-relpath)"
+if [[ "${job}" == "all" || "${job}" == "itar" ]]; then
+	ziprel="${output_dir}/${bn_name}-${bn_texlive_version}.zip"
 	dir=$(cd $(dirname "$ziprel") && pwd)
 	zipfull=$dir/$(basename "$ziprel")
 	tarfull=$dir/$(basename "$ziprel" .zip).tar
