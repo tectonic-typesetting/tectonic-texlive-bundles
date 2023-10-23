@@ -53,6 +53,7 @@ if [[ "${job}" == "all" || "${job}" == "container" ]]; then
 	if [[ "${job}" == "container" ]]; then
 		exit 0
 	fi
+	echo ""
 fi
 
 

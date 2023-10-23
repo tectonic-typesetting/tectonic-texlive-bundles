@@ -30,8 +30,10 @@ function install () {
 	sed -e "s|@dest@|/install|g" /bundle/tl-profile.txt > "${profile}"
 
 	# Install texlive
-	echo "Installing TeXlive, this may take a while..."
-	echo "Logs are streamed to tl-install.log"
+	echo "It is $(date +%H:%M:%S)"
+	echo "Installing TeXlive, this may take a while... (~15 minutes)"
+	echo "Logs are streamed to build/install/${bundle_name}/tl-install.log"
+
 	cd /iso-mount
 	./install-tl -profile "${profile}" > "/install/tl-install.log"
 	result=$?
@@ -39,6 +41,8 @@ function install () {
 	echo "Done, cleaning up..."
 
 	# Cleanup
+	umount /iso-mount
+	rm -d /iso-mount
 	rm "${profile}"
 	chown $HOSTUID:$HOSTGID -R "/install"
 	
