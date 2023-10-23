@@ -18,7 +18,7 @@ To use these tools, you will need:
 
 
 Output files consist of the following:
- - `./build/installs`: TeXlive installation dir; intermedate files.
+ - `./build/install`: TeXlive installation dir; intermedate files.
  - `./build/out`: finished bundles and support files
 
 
@@ -37,14 +37,14 @@ Before building any bundles, acquire a [TeXlive iso](https://tug.org/texlive/acq
 `./build.sh` handles the build process. The simplest way to use it is `./build $bundle all`,
 which executes the following jobs in order:
 
- - **image:** builds the docker container from `./docker`
- - **install:** installs TeXLive to `./build/installs/`
+ - **container:** builds the docker container from `./docker`
+ - **install:** installs TeXLive to `./build/install/`
  - **zip:** creates a zip bundle
  - **itar:** converts that zip to an indexed tar bundle
 
 Each of the steps above requires the previous steps. You may execute them one-by-one as follows. You can also create a bundle manually by reading `build.sh` and running `./build.sh <bundle> shell`.
 ```sh
-./build.sh $bundle image
+./build.sh $bundle container
 ./build.sh $bundle install
 ./build.sh $bundle zip
 ./build.sh $bundle itar
