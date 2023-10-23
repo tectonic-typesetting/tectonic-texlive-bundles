@@ -32,6 +32,10 @@ EOF
 	exit 0
 }
 
+function relpath() {
+	echo "$(realpath --relative-to="$(pwd)" "${1}")"
+}
+
 
 
 
@@ -49,7 +53,7 @@ fi
 # Load and check bundle metadata
 bundle_dir="$(realpath "bundles/${target_bundle}")"
 if [ ! -f "$bundle_dir/bundle.sh" ] ; then
-	echo >&2 "[ERROR] \`$bundle_dir\` has no bundle.sh, cannot proceed."
+	echo >&2 "[ERROR] $(relpath "${bundle_dir}") has no bundle.sh, cannot proceed."
 	exit 1
 fi
 source "${bundle_dir}/bundle.sh"
@@ -77,7 +81,7 @@ mkdir -p "${install_dir}"
 mkdir -p "${output_dir}"
 
 if [ ! -d $iso_dir ]; then 
-	echo >&2 "[ERROR] Cannot start: no directory ${iso_dir}"
+	echo >&2 "[ERROR] Cannot start: no directory $(relpath "${iso_dir}")"
 	exit 1
 fi
 
@@ -136,18 +140,40 @@ fi
 
 # Install texlive in /build/install using our container
 if [[ "${job}" == "all" || "${job}" == "install" ]]; then
+
+	if [ ! -z "$(ls -A "${install_dir}")" ]; then
+		echo >&2 "[ERROR] Installation directory isn't empty, exiting."
+		echo >&2 "Installation is at $(relpath "${install_dir}")"
+		exit 1
+	fi
+
+
 	docker run -it --rm "${docker_args[@]}" $image_name install
 fi
 
 # Make a zip bundle from a texlive installation
 if [[ "${job}" == "all" || "${job}" == "zip" ]]; then
+
+	if [ ! -z "$(ls -A "${output_dir}")" ]; then
+		echo "[WARNING] Output directory isn't empty, deleting in 3 seconds..."
+		sleep 1
+		echo "[WARNING] Output directory isn't empty, deleting in 2 seconds..."
+		sleep 1
+		echo "[WARNING] Output directory isn't empty, deleting in 1 second..."
+		sleep 1
+
+		rm -rf "${output_dir}"
+	fi
+
 	docker run -it --rm "${docker_args[@]}" $image_name makezip
 fi
 
 # Convert zip bundle to an indexed tar bundle
 if [[ "${job}" == "all" || "${job}" == "itar" ]]; then
 	tar_path="${output_dir}/$(basename "$zip_path" .zip).tar"
-	echo "Generating $tar_path ..."
+	rm -f "$tar_path"
+
+	echo "Generating $(relpath "${all_dir}")..."
 	cd $(dirname $0)/zip2tarindex
 	exec cargo run --release -- "$zip_path" "$tar_path"
 fi
