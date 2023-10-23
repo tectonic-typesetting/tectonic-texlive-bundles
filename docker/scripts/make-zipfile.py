@@ -135,7 +135,6 @@ class ZipMaker(object):
             else:
                 ignored_count += 1
 
-        print("")
         print("Done. Summary is below.")
         print(f"\textra file conflicts: {extra_conflict_count}")
         print(f"\ttl files ignored:     {ignored_count}")
@@ -143,8 +142,6 @@ class ZipMaker(object):
         print( "\t==============================")
         print(f"\textra files added:    {extra_count}")
         print(f"\ttotal files added:    {texlive_count+extra_count}")
-        print("\n")
-
 
         if len(self.clashes):
             print(f"Warning: {len(self.clashes)} file clashes were found.")
