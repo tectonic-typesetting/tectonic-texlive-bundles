@@ -3,12 +3,10 @@
 image_name="rework-bundler"
 build_dir="$(pwd)/build"
 iso_dir="$(pwd)/build/iso"
-bundle_name="${1}"
+target_bundle="${1#"bundles/"}" # Remove optional "bundles/" prefix
 shift
 job="${1}"
 shift
-
-
 
 
 function die () {
@@ -39,7 +37,7 @@ EOF
 }
 
 if [[
-	"${bundle_name}" == "" ||
+	"${target_bundle}" == "" ||
 	"${job}" == "" ||
 	! "$job" =~ ^(all|shell|bash|container|install|zip|itar)$
 ]] ; then
@@ -47,21 +45,31 @@ if [[
 fi
 
 
-# Check bundle path
-bundle_dir="$(realpath "bundles/${bundle_name}")"
-if [ ! -f "$bundle_dir/bundle.sh" ] ; then
-	die "Bundle directory \`$bundle_dir\` looks invalid (no bundle.sh)"
-fi
-
-
 # Load and check bundle metadata
-source "${bundle_dir}/bundle.sh"
-if [ "${bundle_name}" != "${bn_name}" ] ; then
-	die "[ERROR] Bundle name does not match folder name. Fix bundles/${bundle_name}/bundle.sh"
+bundle_dir="$(realpath "bundles/${target_bundle}")"
+if [ ! -f "$bundle_dir/bundle.sh" ] ; then
+	die "[ERROR] \`$bundle_dir\` has no bundle.sh, cannot proceed."
 fi
 
-install_dir="${build_dir}/install/${bn_name}-${bn_texlive_version}"
-output_dir="${build_dir}/output/${bn_name}-${bn_texlive_version}"
+source "${bundle_dir}/bundle.sh"
+if [[
+	-z ${bundle_name+x} ||
+	-z ${bundle_texlive_file+x} ||
+	-z ${bundle_texlive_hash+x}
+]] ; then
+	die "[ERROR] Bundle config is missing values, check bundle.sh"
+elif [ "${target_bundle}" != "${bundle_name}" ] ; then
+	die "[ERROR] \$bundle_name does not match folder name."
+fi
+unset target_bundle
+
+
+install_dir="${build_dir}/install/${bundle_name}"
+output_dir="${build_dir}/output/${bundle_name}"
+
+# Must match path in make-zipfile.py
+zip_path="${output_dir}/${bundle_name}.zip"
+
 
 mkdir -p "${install_dir}"
 mkdir -p "${output_dir}"
@@ -70,9 +78,9 @@ mkdir -p "${output_dir}"
 docker_args=(
 	-e HOSTUID=$(id -u)
 	-e HOSTGID=$(id -g)
-	-e bn_name="${bn_name}"
-	-e bn_texlive_version="${bn_texlive_version}"
-	-e bn_texlive_hash="${bn_texlive_hash}"
+	-e bundle_name="${bundle_name}"
+	-e bundle_texlive_version="${bundle_texlive_version}"
+	-e bundle_texlive_hash="${bundle_texlive_hash}"
 	-v "$iso_dir":/iso:ro,z
 	-v "$install_dir":/install:rw,z
 	-v "$output_dir":/output:rw,z
@@ -145,11 +153,8 @@ fi
 
 # Replaces ./driver.sh make-itar bundles/tlextras
 if [[ "${job}" == "all" || "${job}" == "itar" ]]; then
-	ziprel="${output_dir}/${bn_name}-${bn_texlive_version}.zip"
-	dir=$(cd $(dirname "$ziprel") && pwd)
-	zipfull=$dir/$(basename "$ziprel")
-	tarfull=$dir/$(basename "$ziprel" .zip).tar
-	echo "Generating $tarfull ..."
+	tar_path="${output_dir}/$(basename "$zip_path" .zip).tar"
+	echo "Generating $tar_path ..."
 	cd $(dirname $0)/zip2tarindex
-	exec cargo run --release -- "$zipfull" "$tarfull"
+	exec cargo run --release -- "$zip_path" "$tar_path"
 fi
