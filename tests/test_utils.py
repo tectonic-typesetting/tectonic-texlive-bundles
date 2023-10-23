@@ -73,13 +73,13 @@ class Bundle(object):
         return os.path.join(self.statedir, 'testdata', f'{self.name}-{self.version}', *segments)
 
 
-    def artifact_path(self, *segments):
-        return os.path.join(self.statedir, 'artifacts', f'{self.name}-{self.version}', *segments)
+    def output_path(self, *segments):
+        return os.path.join(self.statedir, 'output', f'{self.name}-{self.version}', *segments)
 
 
     def zip_path(self):
-        return self.artifact_path(f'{self.name}-{self.version}.zip')
+        return self.output_path(f'{self.name}-{self.version}.zip')
 
 
     def listing_path(self):
-        return self.artifact_path(f'{self.name}-{self.version}.listing.txt')
+        return self.output_path(f'{self.name}-{self.version}.listing.txt')

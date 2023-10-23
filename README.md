@@ -102,7 +102,7 @@ Run:
 ```
 
 This will create a large Zip-format bundle file with a name something like
-`state/artifacts/tlextras-2020.0r0/tlextras-2020.0r0.zip`. Such a bundle file
+`build/output/tlextras-2020.0r0/tlextras-2020.0r0.zip`. Such a bundle file
 can be used with the `tectonic` command-line program with the `-b` argument.
 
 
