@@ -31,8 +31,8 @@ PATH_listing = Path(f"/output/{NAME}.listing.txt")
 
 
 class ZipMaker(object):
-    def __init__(self, zipfile):
-        self.zipfile = zipfile
+    def __init__(self, zf):
+        self.zf = zf
         self.item_shas = {}
         self.final_hexdigest = None
 
@@ -79,7 +79,7 @@ class ZipMaker(object):
         prev_tuple = self.item_shas.get(full_path.name)
         if prev_tuple is None:
             # This is a new file, ok for now.
-            self.zipfile.writestr(full_path.name, contents)
+            self.zf.writestr(full_path.name, contents)
             self.item_shas[full_path.name] = (digest, full_path)
         elif prev_tuple[0] != digest:
             # We already have a file with this name and different contents
@@ -174,7 +174,7 @@ class ZipMaker(object):
             s.update(self.item_shas[name][0])
 
         self.final_hexdigest = s.hexdigest()
-        self.zipfile.writestr("SHA256SUM", self.final_hexdigest)
+        self.zf.writestr("SHA256SUM", self.final_hexdigest)
 
 
     def write_listing(self, file):
@@ -191,8 +191,8 @@ def entrypoint(argv):
     try:
         paths.append(PATH_zip)
 
-        with zipfile.ZipFile(PATH_zip, "w", zipfile.ZIP_DEFLATED, True) as zipfile:
-            b = ZipMaker(zipfile)
+        with zipfile.ZipFile(PATH_zip, "w", zipfile.ZIP_DEFLATED, True) as zf:
+            b = ZipMaker(zf)
             b.go()
 
         print("Final SHA256SUM:", b.final_hexdigest)
