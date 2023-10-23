@@ -17,8 +17,7 @@ from pathlib import Path
 
 
 # Bundle parameters
-NAME = os.environ["bn_name"]
-VERSION = os.environ["bn_texlive_version"]
+NAME = os.environ["bundle_name"]
 
 # Input paths
 PATH_ignore  = Path("/bundle/ignore")
@@ -28,9 +27,9 @@ PATH_texlive = Path("/install/texmf-dist")
 
 # Output paths
 PATH_clash   = Path("/output/clash-report.txt")
-PATH_zip     = Path(f"/output/{NAME}-{VERSION}.zip")
-PATH_hash    = Path(f"/output/{NAME}-{VERSION}.sha256sum")
-PATH_listing = Path(f"/output/{NAME}-{VERSION}.listing.txt")
+PATH_zip     = Path(f"/output/{NAME}.zip")
+PATH_hash    = Path(f"/output/{NAME}.sha256sum")
+PATH_listing = Path(f"/output/{NAME}.listing.txt")
 
 
 
@@ -174,11 +173,7 @@ def make_arg_parser():
 
 def entrypoint(argv):
     settings = make_arg_parser().parse_args(argv[1:])
-
     paths = []
-
-    name = os.environ["bn_name"]
-    version = os.environ["bn_texlive_version"]
 
     try:
         paths.append(PATH_zip)
