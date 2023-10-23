@@ -1,2 +1,0 @@
-tex/generic/tex-ini-files/pdftexconfig.tex
-tex/luatex/hyph-utf8/etex.src
