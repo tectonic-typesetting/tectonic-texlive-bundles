@@ -4,12 +4,16 @@ image_name="rework-bundler"
 build_dir="$(pwd)/build"
 
 target_bundle="${1#"bundles/"}" # Remove optional "bundles/" prefix
+target_bundle="${target_bundle%/}"
 shift
 job="${1}"
 shift
 iso_name="${1}"
 iso_file="$(realpath "${iso_name}")"
 shift
+
+
+
 
 function help () {
 	cat << EOF
@@ -183,6 +187,21 @@ if [[ "${job}" == "all" || "${job}" == "zip" ]]; then
 
 	docker run -it --rm "${docker_args[@]}" $image_name makezip "$bundle_name"
 	echo ""
+
+	# Check zip hash
+	zip_hash=$(unzip -p "${zip_path}" SHA256SUM)
+
+	if [ "${zip_hash}" != "${bundle_result_hash}" ]; then
+		echo "[WARNING] zip hash does not match expected hash"
+		echo "got      \"${zip_hash}\""
+		echo "expected \"${bundle_result_hash}\""
+		echo ""
+		echo "Build has been stopped, but zip has been created."
+		echo "Run \`./build.sh ${bundle_name} itar\` to continue."
+		exit 1
+	else
+		echo "Zip done, hash matches."
+	fi
 fi
 
 # Convert zip bundle to an indexed tar bundle
