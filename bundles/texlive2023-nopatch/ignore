@@ -22,4 +22,6 @@
 
 
 # Bundle-specific ignore patterns
-/tex/latex-dev/.*
+
+# This line is BAD, causes the `latex.ltx` error.
+#/tex/latex-dev/.*
