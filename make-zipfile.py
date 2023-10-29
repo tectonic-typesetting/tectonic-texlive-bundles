@@ -1,32 +1,62 @@
 # -*- mode: python; coding: utf-8 -*-
 
 """
-This script should be run inside the TeXLive bundler Docker container.
-Creates a Zip file containing all of the resources of a TeXLive installation.
+This script creates a tectonic zip bundle using a finished
+texlive install and a bundle specification.
 """
 
 
+# Tested with Python 3.11.5
+#
+# You shouldn't need a venv,
+# these are all in stdlib
 import sys
-import os
 import zipfile
 import hashlib
 import struct
 from pathlib import Path
+import subprocess
+import re
 
 
 # Bundle parameters
-BUNDLE = sys.argv[1]
+PATH_bundle = Path(sys.argv[1])
+
+if len(sys.argv) >= 3:
+    VAR_texliveSHA = sys.argv[2]
+else:
+    VAR_texliveSHA = ""
+    print("Warning: no TeXlive SHA provided, output will not include a pinned hash")
+
+
+def get_var(varname):
+    bundle_meta = PATH_bundle / "bundle.sh"
+    p = subprocess.Popen(
+        f"echo $(source {bundle_meta}; echo ${varname})",
+        stdout=subprocess.PIPE,
+        shell=True,
+        executable="bash"
+    )
+    return p.stdout.readlines()[0].strip().decode("utf-8")
+
+VAR_bundlename = get_var('bundle_name')
+
+# Not used in code, 
+PATH_output = Path(f"build/output/{VAR_bundlename}")
 
 # Input paths
-PATH_ignore  = Path("/bundle/ignore")
-PATH_extra   = Path("/bundle/include")
-PATH_texlive = Path("/install/texmf-dist")
+PATH_ignore  = PATH_bundle / "ignore"
+PATH_extra   = PATH_bundle / "include"
+PATH_texlive = Path(f"build/install/{VAR_bundlename}/texmf-dist")
 
 # Output paths
-PATH_clash   = Path("/output/clash-report.txt")
-PATH_zip     = Path(f"/output/{BUNDLE}.zip")
-PATH_hash    = Path(f"/output/{BUNDLE}.sha256sum")
-PATH_listing = Path(f"/output/{BUNDLE}.listing.txt")
+PATH_clash       = PATH_output / "clash-report.txt"
+PATH_zip         = PATH_output / f"{VAR_bundlename}.zip"
+PATH_hash        = PATH_output / f"{VAR_bundlename}.sha256sum"
+PATH_texlivehash = PATH_output / f"{VAR_bundlename}.texlive-sha256sum"
+PATH_listing     = PATH_output / f"{VAR_bundlename}.listing.txt"
+
+
 
 
 
@@ -52,6 +82,7 @@ class ZipMaker(object):
                         self.ignore_patterns.add(line)
 
 
+
     def consider_file(self, file):
         """
         Consider adding the specified TeXLive file to the installation tree.
@@ -59,8 +90,10 @@ class ZipMaker(object):
         to come out with a nice pretty tarball in the end.
         """
 
+        f = "/" / file.relative_to(PATH_texlive)
+
         for pattern in self.ignore_patterns:
-            if file.relative_to(PATH_texlive).match(pattern):
+            if re.fullmatch(pattern, str(f)):
                 return False
 
         return True
@@ -142,6 +175,7 @@ class ZipMaker(object):
         print( "\t==============================")
         print(f"\textra files added:    {extra_count}")
         print(f"\ttotal files added:    {texlive_count+extra_count}")
+        print("")
 
         if len(self.clashes):
             print(f"Warning: {len(self.clashes)} file clashes were found.")
@@ -160,7 +194,17 @@ class ZipMaker(object):
                     f.write("\n\n")
 
 
-        print("Computing final hash ...")
+        # This is essentially a detailed version of SHA256SUM,
+        # Good for detecting file differences between bundles
+        with (PATH_output/"file-hashes").open("w") as f:
+            f.write(f"{len(self.item_shas)}\n")
+            for name in sorted(self.item_shas.keys()):
+                f.write(name)
+                f.write("\t")
+                f.write(self.item_shas[name][0].hex())
+                f.write("\n")
+
+        print("Computing bundle hash...", end="")
         s = hashlib.sha256()
         s.update(struct.pack(">I", len(self.item_shas)))
         s.update(b"\0")
@@ -170,8 +214,11 @@ class ZipMaker(object):
             s.update(b"\0")
             s.update(self.item_shas[name][0])
 
+        print("\rFinal SHA256SUM:", s.hexdigest())
+        
         self.final_hexdigest = s.hexdigest()
         self.zf.writestr("SHA256SUM", self.final_hexdigest)
+        self.zf.writestr("TEXLIVE-SHA256SUM", VAR_texliveSHA)
 
 
     def write_listing(self, file):
@@ -182,31 +229,15 @@ class ZipMaker(object):
 
 
 if __name__ == "__main__":
-    paths = []
+    with zipfile.ZipFile(PATH_zip, "w", zipfile.ZIP_DEFLATED, True) as zf:
+        b = ZipMaker(zf)
+        b.go()
 
-    try:
-        paths.append(PATH_zip)
-
-        with zipfile.ZipFile(PATH_zip, "w", zipfile.ZIP_DEFLATED, True) as zf:
-            b = ZipMaker(zf)
-            b.go()
-
-        print("Final SHA256SUM:", b.final_hexdigest)
-
-        print(f"Creating digest file in {PATH_hash}")
-        paths.append(PATH_hash)
-        with PATH_hash.open("w") as f:
-            f.write(b.final_hexdigest+"\n")
-
-        print(f"Creating listing file in {PATH_listing}")
-        paths.append(PATH_listing)
-        with PATH_listing.open("w") as f:
-            b.write_listing(f)
-
-    except Exception as e:
-        try:
-            for p in paths:
-                os.unlink(p)
-        except:
-            pass
-        raise e
+    print("Creating extra info files...", end="")
+    with PATH_hash.open("w") as f:
+        f.write(b.final_hexdigest+"\n")
+    with PATH_listing.open("w") as f:
+        b.write_listing(f)
+    with PATH_texlivehash.open("w") as f:
+        f.write(VAR_texliveSHA+"\n")
+    print("\rCreating extra info files... Done!")

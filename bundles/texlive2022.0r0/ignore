@@ -1,40 +1,29 @@
 #!/bin/bash
 # This isn't a bash script, but that #! should give
 # us pretty highlighting in most editors.
-#
-# [ How to use this file ]
-# Files matching these patterns are ignored.
-# All paths here are relative to texmf-dist
-# in the texlive install tree.
-#
-# [ File format ]
-# One pattern per line. Leading and trailing whitespace is ignored.
-# Comments start with # and must be on their own line.
 
 
 # Files and extensions we usually want to ignore.
 # if you're making a new bundle, it's a good idea to
 # copy this part.
-*/00readme.txt
-*/LICENSE.md
-*/Makefile
-*/README
-*/README.md
-*/ls-R
-*.fmt
-*.log
-*.lua
-*.mf
-*.pl
-*.ps
+.*/00readme\.txt
+.*/LICENSE\.md
+.*/Makefile
+.*/README
+.*/README.md
+.*/ls-R
+.*\.fmt
+.*\.log
+.*\.lua
+.*\.mf
+.*\.pl
+.*\.ps
 # End "always ignore" section.
 
 
 # Bundle-specific ignore patterns
-
-tex/generic/tex-ini-files/pdftexconfig.tex
-tex/luatex/hyph-utf8/etex.src
-
-fonts/map/dvips/*
-tex/latex-dev/*
-tex4ht/*
+/tex/generic/tex-ini-files/pdftexconfig\.tex
+/tex/luatex/hyph-utf8/etex\.src
+/fonts/map/dvips/.*
+/tex/latex-dev/.*
+/tex4ht/.*
