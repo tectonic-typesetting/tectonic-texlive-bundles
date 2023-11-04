@@ -25,3 +25,4 @@
 
 # This line is BAD, causes the `latex.ltx` error.
 #/tex/latex-dev/.*
+#/xindy/.*
