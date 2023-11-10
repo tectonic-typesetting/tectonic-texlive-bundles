@@ -17,16 +17,11 @@ import struct
 from pathlib import Path
 import subprocess
 import re
+import shutil
 
 
 # Bundle parameters
 PATH_bundle = Path(sys.argv[1])
-
-if len(sys.argv) >= 3:
-    VAR_texliveSHA = sys.argv[2]
-else:
-    VAR_texliveSHA = ""
-    print("Warning: no TeXlive SHA provided, output will not include a pinned hash")
 
 
 def get_var(varname):
@@ -41,30 +36,29 @@ def get_var(varname):
 
 VAR_bundlename = get_var('bundle_name')
 
-# Not used in code, 
-PATH_output = Path(f"build/output/{VAR_bundlename}")
+
 
 # Input paths
 PATH_ignore  = PATH_bundle / "ignore"
 PATH_extra   = PATH_bundle / "include"
-PATH_texlive = Path(f"build/install/{VAR_bundlename}/texmf-dist")
+PATH_install = Path(f"build/install/{VAR_bundlename}")
+PATH_texlive = PATH_install / "texmf-dist"
 
 # Output paths
-PATH_clash       = PATH_output / "clash-report.txt"
-PATH_zip         = PATH_output / f"{VAR_bundlename}.zip"
-PATH_hash        = PATH_output / f"{VAR_bundlename}.sha256sum"
-PATH_texlivehash = PATH_output / f"{VAR_bundlename}.texlive-sha256sum"
-PATH_listing     = PATH_output / f"{VAR_bundlename}.listing.txt"
+PATH_output  = Path(f"build/output/{VAR_bundlename}")
+PATH_content = PATH_output / "content"
 
 
 
 
 
-class ZipMaker(object):
-    def __init__(self, zf):
-        self.zf = zf
+class FilePicker(object):
+    def __init__(self):
         self.item_shas = {}
         self.final_hexdigest = None
+
+        # Map of "filename": Path
+        self.index = {}
 
         # Keeps track of conflicting file names
         # { "basename": {
@@ -112,8 +106,18 @@ class ZipMaker(object):
         prev_tuple = self.item_shas.get(full_path.name)
         if prev_tuple is None:
             # This is a new file, ok for now.
-            self.zf.writestr(full_path.name, contents)
             self.item_shas[full_path.name] = (digest, full_path)
+
+            if full_path.is_relative_to(PATH_texlive):
+                target_path = "texlive" / full_path.relative_to(PATH_texlive)
+            else:
+                target_path = "include" / Path(full_path.name)
+    
+            self.index[full_path.name] = target_path
+            target_path = PATH_content / target_path
+            target_path.parent.mkdir(parents = True, exist_ok=True)
+            shutil.copyfile(full_path, target_path)
+
         elif prev_tuple[0] != digest:
             # We already have a file with this name and different contents
             bydigest = self.clashes.setdefault(full_path.name, {})
@@ -126,11 +130,7 @@ class ZipMaker(object):
             pathlist = bydigest.setdefault(digest, [])
             pathlist.append(full_path)
 
-
-
-
     def go(self):
-
         # Statistics for summary
         extra_count = 0 # Extra files added
         extra_conflict_count = 0 # Number of conflicting extra files (0, ideally)
@@ -153,8 +153,9 @@ class ZipMaker(object):
                 extra_basenames.add(f.name)
 
         # Add the main tree.
-        print(f"Zipping {PATH_texlive}...")
         for f in PATH_texlive.rglob("*"):
+            print(f"Selecting files... ({texlive_count+extra_count})", end = "\r")
+
             if not f.is_file():
                 continue
             if f.name in extra_basenames:
@@ -168,20 +169,62 @@ class ZipMaker(object):
             else:
                 ignored_count += 1
 
-        print("Done. Summary is below.")
+        print("Selecting files... Done! Summary is below.")
         print(f"\textra file conflicts: {extra_conflict_count}")
         print(f"\ttl files ignored:     {ignored_count}")
         print(f"\ttl files replaced:    {replaced_count}")
-        print( "\t==============================")
+        print(f"\ttl filename clashes:  {len(self.clashes)}")
+        print( "\t===============================")
         print(f"\textra files added:    {extra_count}")
-        print(f"\ttotal files added:    {texlive_count+extra_count}")
+        print(f"\ttotal files:          {texlive_count+extra_count}")
         print("")
+
+        # Compute content hash
+        s = hashlib.sha256()
+        s.update(struct.pack(">I", len(self.item_shas)))
+        s.update(b"\0")
+        for name in sorted(self.item_shas.keys()):
+            s.update(name.encode("utf8"))
+            s.update(b"\0")
+            s.update(self.item_shas[name][0])
+        self.final_hexdigest = s.hexdigest()
+
+        # Write bundle metadata
+        with (PATH_content / "SHA256SUM").open("w") as f:
+            f.write(self.final_hexdigest)
+        if (PATH_install / "TEXLIVE-SHA256SUM").is_file():
+            shutil.copyfile(
+                PATH_install / "TEXLIVE-SHA256SUM",
+                PATH_content / "TEXLIVE-SHA256SUM"
+            )
+        with (PATH_content / "INDEX").open("w") as f:
+            for k, p in sorted(self.index.items(), key = lambda x: x[0]):
+                f.write(f"{k} {p}\n")
+
+
+
+        # Write debug files
+
+        # This is essentially a detailed version of SHA256SUM,
+        # Good for detecting file differences between bundles
+        with (PATH_output / "file-hashes").open("w") as f:
+            f.write(f"{len(self.item_shas)}\n")
+            for name in sorted(self.item_shas.keys()):
+                f.write(name)
+                f.write("\t")
+                f.write(self.item_shas[name][0].hex())
+                f.write("\n")
+
+
+        with (PATH_output / "listing").open("w") as f:
+            for base in sorted(self.item_shas.keys()):
+                f.write(base+"\n")
 
         if len(self.clashes):
             print(f"Warning: {len(self.clashes)} file clashes were found.")
-            print(f"Logging clash report to {PATH_clash}")
+            print(f"Logging clash report to {PATH_output}/clash-report")
 
-            with PATH_clash.open("w") as f:
+            with (PATH_output / "clash-report").open("w") as f:
                 for filename in sorted(self.clashes.keys()):
                     f.write(f"{filename}:\n")
                     bydigest = self.clashes[filename]
@@ -194,50 +237,8 @@ class ZipMaker(object):
                     f.write("\n\n")
 
 
-        # This is essentially a detailed version of SHA256SUM,
-        # Good for detecting file differences between bundles
-        with (PATH_output/"file-hashes").open("w") as f:
-            f.write(f"{len(self.item_shas)}\n")
-            for name in sorted(self.item_shas.keys()):
-                f.write(name)
-                f.write("\t")
-                f.write(self.item_shas[name][0].hex())
-                f.write("\n")
-
-        print("Computing bundle hash...", end="")
-        s = hashlib.sha256()
-        s.update(struct.pack(">I", len(self.item_shas)))
-        s.update(b"\0")
-
-        for name in sorted(self.item_shas.keys()):
-            s.update(name.encode("utf8"))
-            s.update(b"\0")
-            s.update(self.item_shas[name][0])
-
-        print("\rFinal SHA256SUM:", s.hexdigest())
-        
-        self.final_hexdigest = s.hexdigest()
-        self.zf.writestr("SHA256SUM", self.final_hexdigest)
-        self.zf.writestr("TEXLIVE-SHA256SUM", VAR_texliveSHA)
-
-
-    def write_listing(self, file):
-        for base in sorted(self.item_shas.keys()):
-            file.write(base+"\n")
-
-
 
 
 if __name__ == "__main__":
-    with zipfile.ZipFile(PATH_zip, "w", zipfile.ZIP_DEFLATED, True) as zf:
-        b = ZipMaker(zf)
-        b.go()
-
-    print("Creating extra info files...", end="")
-    with PATH_hash.open("w") as f:
-        f.write(b.final_hexdigest+"\n")
-    with PATH_listing.open("w") as f:
-        b.write_listing(f)
-    with PATH_texlivehash.open("w") as f:
-        f.write(VAR_texliveSHA+"\n")
-    print("\rCreating extra info files... Done!")
+    b = FilePicker()
+    b.go()

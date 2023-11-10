@@ -49,8 +49,7 @@ else
 	# We don't check iso_file here, since it's only required for some jobs.
 	if [[
 		"${bundle_dir}" == "" ||
-		"${job}" == "" ||
-		! "$job" =~ ^(all|shell|bash|container|install|forceinstall|zip|itar)$
+		"${job}" == ""
 	]] ; then
 		help
 	fi
@@ -152,22 +151,27 @@ function install() {
 		-v "$bundle_dir":/bundle:ro,z
 	)
 
+
+	# We need this even if we're not checking the hash,
+	# since this information is saved to the bundle.
+	echo "Hashing TeXlive iso..."
+	local iso_hash=$( sha256sum -b "$iso_file" | awk '{ print $1 }' )
+	echo "Done: ${iso_hash}"
+
 	# Check texlive iso hash
 	if [[ "${1}" != "nohash" ]]; then
 		if [[ "${bundle_texlive_hash}" == "" ]]; then
 			echo "Not checking TeXlive hash, bundle doesn't provide one."
 			echo "Continuing..."
-			sleep 2
-			exit 0
+			sleep 1
 		else
 			echo "Checking iso hash against $(relative "${bundle_dir}")..."
-			local hash=$( sha256sum -b "$iso_file" | awk '{ print $1 }' )
-			if [[ "${hash}" == "${bundle_texlive_hash}" ]]; then
+			if [[ "${iso_hash}" == "${bundle_texlive_hash}" ]]; then
 				echo "OK: hash matches."
 			else
 				echo "Error: checksums do not match."
 				echo ""
-				echo "Got       $hash"
+				echo "Got       $iso_hash"
 				echo "Expected  $bundle_texlive_hash"
 				exit 1
 			fi
@@ -203,17 +207,15 @@ function install() {
 		exit 1
 	fi
 
+	# Record iso hash
+	echo "${iso_hash}" > "${install_dir}/TEXLIVE-SHA256SUM"
+
 	echo ""
 }
 
 
-
-
-
-# Make a zip bundle from a texlive installation
-function make_zip() {
-	needs_iso
-
+# Select files for this bundle
+function select_files() {
 	mkdir -p "${output_dir}"
 	if [ ! -z "$(ls -A "${output_dir}")" ]; then
 		echo "Output directory is $(relative "${output_dir}")"
@@ -230,51 +232,63 @@ function make_zip() {
 	fi
 	mkdir -p "${output_dir}"
 
-
-	echo "Hashing TeXlive iso..."
-	echo "Make sure this is the same file you provided to \`install\`!"
-	sleep 1
-	local hash=$( sha256sum -b "$iso_file" | awk '{ print $1 }' )
-	echo "Done: ${hash}"
-	echo ""
-
-	python3 make-zipfile.py "${bundle_dir}" "${hash}"
+	python3 select-files.py "${bundle_dir}"
 	if [[ $? != 0 ]]; then
-		echo "Zip failed"
+		echo "File selector failed"
 		exit 1
 	fi
 	echo ""
 
-	# Check zip hash
-	local zip_hash=$(unzip -p "${zip_path}" SHA256SUM)
+	# Check content hash
+	local content_hash=$(cat "${output_dir}/content/SHA256SUM")
 
-
-	# Check result hash
 	if [[ "${1}" != "nohash" ]]; then
 		if [[ "${bundle_texlive_hash}" == "" ]]; then
-			echo "Not checking result hash, bundle doesn't provide one."
+			echo "Not checking content hash, bundle doesn't provide one."
 			echo "Continuing..."
 			sleep 2
 			exit 0
 		else
-			if [ "${zip_hash}" != "${bundle_result_hash}" ]; then
-				echo "[WARNING] zip hash does not match expected hash"
-				echo "got      \"${zip_hash}\""
+			if [ "${content_hash}" != "${bundle_result_hash}" ]; then
+				echo "[WARNING] content hash does not match expected hash"
+				echo "got      \"${content_hash}\""
 				echo "expected \"${bundle_result_hash}\""
 				echo ""
-				echo "Build has been stopped, but zip has been created."
-				echo "Run \`./build.sh $(relative "${bundle_dir}") itar\` to continue."
+				echo "Build has been stopped, but files have been selected."
+				echo "Run \`./build.sh $(relative "${bundle_dir}") zip\` to continue."
 				exit 1
 			else
-				echo "Zip done, hash matches."
+				echo "File selection done, hash matches."
 			fi
 		fi
 	fi
-
-	
 }
 
 
+
+# Make zip bundle from content directory
+function make_zip() {
+	if [ -z "$(ls -A "${output_dir}/content")" ]; then
+		echo "Bundle content directory doesn't exist at $(relative "${output_dir}/content")"
+		echo "Cannot proceed. Run \`./build.sh $(relative "${bundle_dir}") content\`, then try again."
+		exit 1
+	fi
+
+	if [[ -f "${zip_path}" ]]; then
+		echo "Zip bundle exists at $(relative "${zip_path}"), removing."
+		rm "${zip_path}"
+	fi
+
+	# Size is an estimate, since zip compresses files.
+	# Output will be smaller than input!
+	echo "Making zip bundle from content directory..."
+	local size=$(du -bs "${output_dir}/content" | awk '{print $1}')
+	zip -qjr - "${output_dir}/content" | \
+		pv -bea -s $size \
+		> "${zip_path}"
+	echo "Done."
+	echo ""
+}
 
 
 
@@ -327,6 +341,10 @@ case "${job}" in
 		install nohash
 	;;
 
+	"select")
+		select_files
+	;;
+
 	"zip")
 		make_zip
 	;;
@@ -336,8 +354,6 @@ case "${job}" in
 	;;
 
 	*)
-		echo "Warning: unreachable code!"
-		echo ""
 		help
 	;;
 esac

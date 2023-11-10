@@ -57,7 +57,8 @@ Before building any bundles, acquire a [TeXlive iso](https://tug.org/texlive/acq
 To build a bundle, run `./build <bundle dir> all <iso path>`. This executes the following jobs in order:
  - `./build container`: builds the docker container from `./docker`
  - `./build <bundle> install <iso>`: installs TeXLive to `./build/install/`
- - `./build <bundle> zip <iso>`: creates a zip bundle. Local zip bundles may be used in place of web bundles (see tectonic docs).
+ - `./build <bundle> select <iso>`: assemble all files into a bundle at `./build/output/content`
+ - `./build <bundle> zip <iso>`: create a zip bundle from a content dir.
  - `./build <bundle> itar`: converts that zip to an indexed tar bundle. This will NOT work if a zip bundle doesn't exist.
  itar bundles may not be used locally, they are only used as web bundles. If you want to host your own, you'll need to put `bundle.tar` and `<bundle>.tar.sha256sum` under the same url.
 
@@ -78,15 +79,22 @@ there's no reason to do this unless something breaks.
 
 ## Output Files
 
+
+**`./build.sh <bundle> select` produces the following:**
+ - `./build/output/$bundle/content`: contains all bundle files. This directory also contains some metadata:
+   - `content/INDEX`: each line of this file maps a filename in the bundle to a relative path.
+   - `content/SHA256SUM`: a hash of this bundle's contents.
+   - `content/TEXLIVE-SHA265SUM`: a hash of the TeXlive image used to build this bundle.
+ - `listing`: a sorted list of all files in the bundle
+ - `clash-report`: debug file. did any files have the same name? (if any)
+ - `file-hashes`: debug file. Indexes the contents of the bundle. Used to find which files differ between two builds.
+  `file-hashes` and `content/SHA265SUM` are generated in roughly the same way. The `file-hashes` files from two different
+ bundles should match if and only if the two bundles have the same sha256sum
+
+
 **`./build.sh <bundle> zip` produces the following:**
  - `$bundle.zip`: the main zip bundle
- - `clash-report.txt`: debug file. did any files have the same name? (if any)
- - `$bundle.listing.txt`: a sorted list of all files in the bundle
- - `$bundle.texlive-sha256sum`: a hash of the TeXlive image used to build this bundle. This file is also in the zip as `TEXLIVE-SHA256SUM`.
- - `file-hashes`: debug file. Indexes the contents of the bundle. Used to find which files differ between two builds.
- - `$bundle.sha256sum`: a hash of the zip's contents. This file is also in the zip as `SHA256SUM`. \
- `file-hashes` and `$bundle.sha256sum` are generated in roughly the same way. The `file-hashes` files from two different
- bundles should match if and only if the two bundles have the same sha256sum.
+
 
 **`./build.sh <bundle> itar` produces the following:**\
 Note that both `$bundle.tar` and `$bundle.tar.index.gz` are required to host a web bundle.
@@ -103,15 +111,15 @@ Note that both `$bundle.tar` and `$bundle.tar.index.gz` are required to host a w
 
 
 ## Reproducibility
-The `SHA256HASH` stored in each bundle may change, even for identical builds! It depends on the contents of each file, and some files change every build. We do our best to prevent this.
+The `SHA256HASH` stored in each bundle should stay the same between builds. \
+Below is a list of "problem files" that have made bit-perfect rebuilds difficult in the past:
 
-**The following files contain a timestamp:**
+**The following contain a timestamp:**
  - `fmtutil.cnf`
  - `mf.base`
  - `updmap.cfg`
 
-**The following files contain a UUID:** \
-Most have *both* a UUID and a timestamp.
+**The following contain a UUID:** (Most of these have a UUID *and* a timestamp)
  - `357744afc7b3a35aafa10e21352f18c5.luc`
  - `929f6dbc83f6d3b65dab91f1efa4aacb.luc`
  - `b4a1d8ccc0c60e24e909f01c247f0a0f.luc`
