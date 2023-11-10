@@ -7,7 +7,6 @@ use std::fs::File;
 use std::io::{stderr, Cursor, Error, ErrorKind, Read, Write};
 use std::os::unix::ffi::OsStringExt;
 use std::{fmt, path, process};
-use zip::ZipArchive;
 
 // Here is stuff from tar-rs's lib.rs:
 
@@ -18,6 +17,8 @@ pub use header::{GnuHeader, GnuSparseHeader, Header, OldHeader, UstarHeader};
 //pub use archive::{Archive, Entries};
 pub use builder::HackedBuilder;
 pub use pax::{PaxExtension, PaxExtensions};
+use walkdir::WalkDir;
+
 
 //mod archive;
 mod builder;
@@ -43,8 +44,8 @@ fn main() {
         .version("0.1")
         .about("Convert a Zip file to a tar file with an index.")
         .arg(
-            Arg::with_name("ZIPFILE")
-                .help("The input Zip file to process.")
+            Arg::with_name("SOURCEDIR")
+                .help("A directory containing bundle contents.")
                 .required(true)
                 .index(1),
         )
@@ -56,15 +57,10 @@ fn main() {
         )
         .get_matches();
 
-    let zippath = matches.value_of("ZIPFILE").unwrap();
+    let sourcepath = matches.value_of("SOURCEDIR").unwrap();
     let tarpath = matches.value_of("TARPATH").unwrap();
 
     // Open files.
-
-    let zipfile = match File::open(zippath) {
-        Ok(f) => f,
-        Err(e) => die(format_args!("failed to open \"{}\": {}", zippath, e)),
-    };
 
     let mut tarfile = match File::create(tarpath) {
         Ok(f) => f,
@@ -86,25 +82,6 @@ fn main() {
 
     // Stack up our I/O processing chain.
 
-    let mut zip = match ZipArchive::new(zipfile) {
-        Ok(a) => a,
-        Err(e) => die(format_args!(
-            "couldn\'t open {} as a Zip file: {}",
-            zippath, e
-        )),
-    };
-
-    if zip.len() == 0xFFFF {
-        // OK, I suppose it's possible that the Zip file really has exactly
-        // 65535 files in it. But zip-rs 0.2.3 doesn't handle ZIP64 files, and
-        // the behavior you get is what's tested for here -- which then can
-        // cause silent failures, with the resulting tar file not containing
-        // all of the files it should.
-        die(format_args!(
-            "this Zip file requires a ZIP64-capable parser, which we don't have"
-        ));
-    }
-
     let mut gzindex = flate2::GzBuilder::new()
         .filename(tar_fn.into_vec())
         .write(indexfile, flate2::Compression::default());
@@ -115,36 +92,39 @@ fn main() {
 
     let mut header = Header::new_gnu();
 
-    for i in 0..zip.len() {
-        let mut file = zip.by_index(i).unwrap();
-        let size = file.size();
+    for entry in WalkDir::new(sourcepath).into_iter().filter_map(|e| e.ok()) {
+        let p = entry.path();
+        if p.is_dir() { continue; }
+
+        let n = match p.file_name() {
+            Some(a) => a.to_str().unwrap(),
+            None => die(format_args!("couldn't get file name of \"{:?}\"", p))
+        };
+
+        let mut file = match File::open(p) {
+            Ok(a) => a,
+            Err(e) => die(format_args!("couldn't open file \"{}\": {}", n, e))
+        };
+
+        let size = match file.metadata() {
+            Ok(a) => a.len(),
+            Err(e) => die(format_args!("couldn't get size of \"{}\": {}", n, e))
+        };
 
         let mut buf = Vec::with_capacity(size as usize);
         if let Err(e) = file.read_to_end(&mut buf) {
-            die(format_args!(
-                "failure reading \"{}\" from Zip: {}",
-                file.name(),
-                e
-            ));
+            die(format_args!("failure reading \"{}\": {}", n, e));
         }
 
-        if let Err(e) = header.set_path(file.name()) {
-            die(format_args!(
-                "failure encoding filename \"{}\": {}",
-                file.name(),
-                e
-            ));
+        if let Err(e) = header.set_path(n) {
+            die(format_args!("failure encoding filename \"{}\": {}", n, e));
         }
 
         header.set_size(size);
         header.set_cksum();
 
         if let Err(e) = tar.append(&header, Cursor::new(buf)) {
-            die(format_args!(
-                "failure appending \"{}\" to tar: {}",
-                file.name(),
-                e
-            ));
+            die(format_args!("failure appending \"{}\" to tar: {}", n, e));
         }
     }
 

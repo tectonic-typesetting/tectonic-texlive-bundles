@@ -298,18 +298,12 @@ function make_zip() {
 function make_itar() {
 	mkdir -p "${output_dir}"
 
-	if [[ ! -f "$zip_path" ]]; then
-		echo "There is no zip file at $(relative "${zip_path}")."
-		echo "Run \`./build.sh $(relative "${bundle_dir}") zip\` to make it."
-		exit 1
-	fi
-
 	local tar_path="${output_dir}/${bundle_name}.tar"
 	rm -f "$tar_path"
 
 	echo "Generating $(relative "${tar_path}")..."
 	cd $(dirname $0)/zip2tarindex
-	exec cargo run --release -- "$zip_path" "$tar_path"
+	exec cargo run --release -- "${output_dir}/content" "$tar_path"
 	echo ""
 }
 
@@ -321,8 +315,7 @@ case "${job}" in
 	"all")
 		container
 		install
-		make_zip
-		make_itar
+		select_files
 	;;
 
 	"shell" | "bash")

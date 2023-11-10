@@ -57,13 +57,18 @@ Before building any bundles, acquire a [TeXlive iso](https://tug.org/texlive/acq
 To build a bundle, run `./build <bundle dir> all <iso path>`. This executes the following jobs in order:
  - `./build container`: builds the docker container from `./docker`
  - `./build <bundle> install <iso>`: installs TeXLive to `./build/install/`
- - `./build <bundle> select <iso>`: assemble all files into a bundle at `./build/output/content`
- - `./build <bundle> zip <iso>`: create a zip bundle from a content dir.
- - `./build <bundle> itar`: converts that zip to an indexed tar bundle. This will NOT work if a zip bundle doesn't exist.
- itar bundles may not be used locally, they are only used as web bundles. If you want to host your own, you'll need to put `bundle.tar` and `<bundle>.tar.sha256sum` under the same url.
+ - `./build <bundle> select`: assemble all files into a bundle at `./build/output/content`
 
-Each of the steps above requires the previous steps. You may execute them manually, although
-there's no reason to do this unless something breaks.
+These steps **must** be run in order.
+
+
+Once `./build/output/content` has been created, run any of the following commands to package the bundle:
+ - `./build <bundle> zip`: create a zip bundle from the content directory.\
+  Zip bundles can only be used locally, they may not be hosted on the web.
+
+ - `./build <bundle> itar`: create an indexed tar bundle from the content directory. \
+ These cannot be used locally, itar bundles must be used as web bundles. \
+ If you want to host your own, you'll need to put `bundle.tar` and `<bundle>.tar.sha256sum` under the same url.
 
 
 ### Build Notes:
