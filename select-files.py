@@ -158,16 +158,21 @@ class FilePicker(object):
 
             if not f.is_file():
                 continue
+
+            if not self.consider_file(f):
+                ignored_count += 1
+                continue
+
+            # This should be done AFTER consider_file,
+            # since we want a warning only if this file isn't ignored.
             if f.name in extra_basenames:
                 print(f"Warning: ignoring {f.name}, our bundle provides an alternative")
                 replaced_count += 1
                 continue
 
-            if self.consider_file(f):
-                texlive_count += 1
-                self.add_file(f)
-            else:
-                ignored_count += 1
+            texlive_count += 1
+            self.add_file(f)
+                
 
         print("Selecting files... Done! Summary is below.")
         print(f"\textra file conflicts: {extra_conflict_count}")
