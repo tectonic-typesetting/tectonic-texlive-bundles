@@ -334,7 +334,7 @@ case "${job}" in
 		install nohash
 	;;
 
-	"select")
+	"select" | "content")
 		select_files
 	;;
 
