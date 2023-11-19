@@ -14,7 +14,7 @@ RUN apt-get update && \
 	rm -rf /var/lib/apt/lists/*
 
 
-COPY --chmod=770 entrypoint.sh /
+COPY entrypoint.sh /
 
-ENTRYPOINT [ "/entrypoint.sh" ]
+ENTRYPOINT [ "bash", "/entrypoint.sh" ]
 CMD [ "help" ]
