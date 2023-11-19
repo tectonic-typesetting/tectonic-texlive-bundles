@@ -39,11 +39,10 @@ Each directory in `./bundles` is a *bundle specification* which contains everyth
 See [`./bundles/README.md`](./bundles/README.md) for details.
 
 The following bundles are available:
- - `texlive/2022.0r0`: all of TeXlive, plus a few patches. Directly copied from `master`. \
- Uses `texlive-2022.0r0`.
+ - `texlive/2022.0r0`: directly copied from the bundle in `master`. \
+ Uses `texlive-2022.0r0`, and is probably broken.
 
- - `texlive2023-nopatch`: texlive2023 with no patches. \
- Uses `texlive-2023.0r0`.
+ - `texlive2023-nopatch`: based on `texlive-2023.0r0`.
 
 
 
