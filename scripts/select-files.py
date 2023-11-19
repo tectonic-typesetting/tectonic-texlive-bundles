@@ -162,7 +162,7 @@ class FilePicker(object):
         if not self.is_patched(file):
             return False
 
-        self.clearprint(f"Patching {file.name}...")
+        self.clearprint(f"Patching {file.name}")
         self.diffs_applied += 1
         subprocess.run([
             "patch",

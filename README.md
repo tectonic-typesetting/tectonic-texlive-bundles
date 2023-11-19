@@ -21,6 +21,7 @@ To use these tools, you will need:
 
 - Bash
 - Python 3.11 & Python standard packages
+- GNU `patch` and `diff`
 - An installation of [Docker](https://www.docker.com/).
 - A [TeXlive iso](https://tug.org/texlive/acquire-iso.html). Different bundles need different TeXlive versions.
 - A Rust toolchain if you want to create “indexed tar” bundles. You don’t
