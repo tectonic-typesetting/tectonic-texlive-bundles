@@ -205,9 +205,13 @@ class FilePicker(object):
 
         # Add the main tree.
         for f in PATH_texlive.rglob("*"):
-            s = f"Selecting files... ({texlive_count+extra_count})"
-            self.print_len = len(s)
-            print(s, end = "\r")
+
+            # Update less often so we spend fewer cycles on string manipulation.
+            # mod 153 so every digit moves (modding by 100 is boring, we get static zeros)
+            if (texlive_count+extra_count) % 153 == 0:
+                s = f"Selecting files... ({texlive_count+extra_count})"
+                self.print_len = len(s)
+                print(s, end = "\r")
 
             if not f.is_file():
                 continue
