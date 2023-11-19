@@ -54,8 +54,13 @@ else
 		help
 	fi
 
+
 	# Load and check bundle metadata
-	if [ ! -f "$bundle_dir/bundle.sh" ] ; then
+	if [ ! -d "$bundle_dir" ]; then
+		echo >&2 "[ERROR] $(relative "${bundle_dir}") doesn't exist, cannot proceed."
+		exit 1
+	fi
+	if [ ! -f "$bundle_dir/bundle.sh" ]; then
 		echo >&2 "[ERROR] $(relative "${bundle_dir}") has no bundle.sh, cannot proceed."
 		exit 1
 	fi
