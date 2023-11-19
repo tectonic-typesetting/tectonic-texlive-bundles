@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 image_name="rework-bundler"
-build_dir="$(pwd)/build"
+this_dir="$(pwd)"
+build_dir="${this_dir}/build"
 
 
 
@@ -13,7 +14,7 @@ function help () {
 }
 
 function relative() {
-	echo "./$(realpath --relative-to="$(pwd)" "${1}")"
+	echo "./$(realpath --relative-to="${this_dir}" "${1}")"
 }
 
 
@@ -307,9 +308,14 @@ function make_itar() {
 	rm -f "$tar_path"
 
 	echo "Generating $(relative "${tar_path}")..."
-	cd $(dirname $0)/zip2tarindex
+ 
+	cd "scripts/zip2tarindex"
+	
+	# all paths are absolute, so this should work even after `cd`
 	exec cargo run --release -- "${output_dir}/content" "$tar_path"
 	echo ""
+
+	cd "$this_dir"
 }
 
 

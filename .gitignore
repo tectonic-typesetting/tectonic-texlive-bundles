@@ -1,5 +1,5 @@
 __pycache__/
 /build
-/zip2tarindex/target/
+/scripts/zip2tarindex/target/
 *.ignore
 *.iso
