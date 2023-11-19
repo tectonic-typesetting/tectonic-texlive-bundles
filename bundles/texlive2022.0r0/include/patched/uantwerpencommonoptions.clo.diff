@@ -1,0 +1,18 @@
+127,134c127,134
+<   \newcommand*\logopos{Logos/logo-uantwerpen-\fselector-\lselector-\colormodel-pos}
+<   \newcommand*\logoposua{Logos/logo-uantwerpen-ua-\lselector-\colormodel-pos}
+<   \newcommand*\logoneg{Logos/logo-uantwerpen-\fselector-\lselector-\colormodel-neg}
+<   \newcommand*\logonegua{Logos/logo-uantwerpen-ua-\lselector-\colormodel-neg}
+<   \newcommand*\logomonowhite{Logos/logo-uantwerpen-\fselector-\lselector-\colormodel-mono-white}
+<   \newcommand*\logomonowhiteua{Logos/logo-uantwerpen-ua-\lselector-\colormodel-mono-white}
+<   \newcommand*\iconfile{Logos/icon-uantwerpen-\fselector-\colormodel}
+<   \newcommand*\iconfileua{Logos/icon-uantwerpen-ua-\colormodel}
+---
+>   \newcommand*\logopos{logo-uantwerpen-\fselector-\lselector-\colormodel-pos}
+>   \newcommand*\logoposua{logo-uantwerpen-ua-\lselector-\colormodel-pos}
+>   \newcommand*\logoneg{logo-uantwerpen-\fselector-\lselector-\colormodel-neg}
+>   \newcommand*\logonegua{logo-uantwerpen-ua-\lselector-\colormodel-neg}
+>   \newcommand*\logomonowhite{logo-uantwerpen-\fselector-\lselector-\colormodel-mono-white}
+>   \newcommand*\logomonowhiteua{logo-uantwerpen-ua-\lselector-\colormodel-mono-white}
+>   \newcommand*\iconfile{icon-uantwerpen-\fselector-\colormodel}
+>   \newcommand*\iconfileua{icon-uantwerpen-ua-\colormodel}

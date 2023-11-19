@@ -1,0 +1,22 @@
+69,80c69,76
+<   \cs_set:Npn \__sys_tmp:w #1 Version ~ #2 ~ #3 \q_stop {#2}
+<   \sys_get_shell:nnNTF { extractbb~--version }
+<     { \char_set_catcode_space:n { `\  } }
+<     \l__sys_internal_tl
+<     {
+<       \int_const:Nn \c__kernel_sys_dvipdfmx_version_int
+<         {
+<           \exp_after:wN \__sys_tmp:w \l__sys_internal_tl
+<             \q_stop
+<         }
+<     }
+<     { \int_const:Nn \c__kernel_sys_dvipdfmx_version_int { 0 } }
+---
+>   % Tectonic: vendor logic here detects dvipdfmx version
+>   % by opening `|extractbb --version` as a pipe input, which
+>   % we don't support (#859). The pipe attempt only kicks in
+>   % when shell-escape is enabled so it's not a showstopper but
+>   % it's not good. Fortunately we know what version of xdvipdfmx
+>   % we have! It can be found in the `AC_INIT(...)` line of
+>   % `Build/source/texk/dvipdfm-x/configure.ac` in the TeXLive repo.
+>   \int_const:Nn \c__kernel_sys_dvipdfmx_version_int { 20210318 }

@@ -1,0 +1,4 @@
+45c45
+< \newfontfamily{\FA}{FontAwesome}
+---
+> \newfontfamily{\FA}{FontAwesome.otf}
