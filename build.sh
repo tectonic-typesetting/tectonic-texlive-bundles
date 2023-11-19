@@ -232,7 +232,7 @@ function select_files() {
 	fi
 	mkdir -p "${output_dir}"
 
-	python3 select-files.py "${bundle_dir}"
+	python3 scripts/select-files.py "${bundle_dir}"
 	if [[ $? != 0 ]]; then
 		echo "File selector failed"
 		exit 1
