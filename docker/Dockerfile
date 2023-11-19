@@ -1,10 +1,8 @@
 FROM ubuntu:20.04
 
-# These volumes seem to cause problems on
-# some systems. Not sure why.
-#VOLUME /iso.img
-#VOLUME /bundle/
-#VOLUME /install/
+VOLUME /iso.img
+VOLUME /bundle/
+VOLUME /install/
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && \
