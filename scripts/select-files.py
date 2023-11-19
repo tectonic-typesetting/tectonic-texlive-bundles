@@ -66,6 +66,16 @@ class FilePicker(object):
         # }}
         self.clashes = {}
 
+        # Array of diff file paths in include dir.
+        # Scanned at start of run, applied while running.
+        # Map of "filename": Path(filename.diff)
+        self.diffs = {}
+        self.diffs_applied = 0 # How many diffs we've applied
+
+        # Length of "Patching (n)" string,
+        # used only for pretty printing.
+        self.print_len = 0
+
         # Load ignore patterns
         self.ignore_patterns = set()
         if PATH_ignore.is_file():
@@ -75,6 +85,14 @@ class FilePicker(object):
                     if len(line):
                         self.ignore_patterns.add(line)
 
+
+    # Print and pad with spaces.
+    # Used when printing while adding.
+    def clearprint(self, string):
+        l = len(string)
+        if l < self.print_len:
+            string += " "*l
+        print(string)
 
 
     def consider_file(self, file):
@@ -108,15 +126,21 @@ class FilePicker(object):
             # This is a new file, ok for now.
             self.item_shas[full_path.name] = (digest, full_path)
 
-            if full_path.is_relative_to(PATH_texlive):
-                target_path = "texlive" / full_path.relative_to(PATH_texlive)
+            target_path = PATH_content
+            if self.is_patched(full_path):
+                target_path /= "patched" / Path(full_path.name)
+            elif full_path.is_relative_to(PATH_texlive):
+                target_path /= "texlive" / full_path.relative_to(PATH_texlive)
+            elif full_path.is_relative_to(PATH_extra):
+                target_path /= "include" / full_path.relative_to(PATH_extra)
             else:
-                target_path = "include" / Path(full_path.name)
-    
-            self.index[full_path.name] = target_path
-            target_path = PATH_content / target_path
+                target_path /= "unknown" / Path(full_path.name)
+
+            self.index[full_path.name] = target_path.relative_to(PATH_content)
             target_path.parent.mkdir(parents = True, exist_ok=True)
             shutil.copyfile(full_path, target_path)
+            self.apply_diff(target_path) # has no effect if there is no diff
+
 
         elif prev_tuple[0] != digest:
             # We already have a file with this name and different contents
@@ -129,6 +153,26 @@ class FilePicker(object):
 
             pathlist = bydigest.setdefault(digest, [])
             pathlist.append(full_path)
+
+
+    def is_patched(self, file):
+        return file.name in self.diffs
+
+    def apply_diff(self, file):
+        if not self.is_patched(file):
+            return False
+
+        self.clearprint(f"Patching {file.name}...")
+        self.diffs_applied += 1
+        subprocess.run([
+            "patch",
+            "--quiet",
+            "--no-backup",
+            file,
+            self.diffs[file.name]
+        ])
+
+        return True
 
     def go(self):
         # Statistics for summary
@@ -144,8 +188,15 @@ class FilePicker(object):
             for f in PATH_extra.rglob("*"):
                 if not f.is_file():
                     continue
+                if f.suffix == ".diff":
+                    n = f.name[:-5] # Cut off ".diff"
+                    if n in self.diffs:
+                        print(f"Warning: included diff {f.name} has conflicts, ignoring")
+                        continue
+                    self.diffs[n] = f
+                    continue
                 if f.name in extra_basenames:
-                    print(f"Warning: extra file {f.name} has conflicts, ignoring")
+                    print(f"Warning: included file {f.name} has conflicts, ignoring")
                     extra_conflict_count += 1
                     continue
                 self.add_file(f)
@@ -154,7 +205,9 @@ class FilePicker(object):
 
         # Add the main tree.
         for f in PATH_texlive.rglob("*"):
-            print(f"Selecting files... ({texlive_count+extra_count})", end = "\r")
+            s = f"Selecting files... ({texlive_count+extra_count})"
+            self.print_len = len(s)
+            print(s, end = "\r")
 
             if not f.is_file():
                 continue
@@ -164,9 +217,9 @@ class FilePicker(object):
                 continue
 
             # This should be done AFTER consider_file,
-            # since we want a warning only if this file isn't ignored.
+            # since we want to increment the counter only if
+            # this file wasn't ignored.
             if f.name in extra_basenames:
-                print(f"Warning: ignoring {f.name}, our bundle provides an alternative")
                 replaced_count += 1
                 continue
 
@@ -179,10 +232,14 @@ class FilePicker(object):
         print(f"\ttl files ignored:     {ignored_count}")
         print(f"\ttl files replaced:    {replaced_count}")
         print(f"\ttl filename clashes:  {len(self.clashes)}")
+        print(f"\tdiffs applied/found:  {self.diffs_applied}/{len(self.diffs)}")
         print( "\t===============================")
         print(f"\textra files added:    {extra_count}")
         print(f"\ttotal files:          {texlive_count+extra_count}")
         print("")
+
+        if len(self.diffs) != self.diffs_applied:
+            print("Warning: not all diffs were applied")
 
         # Compute content hash
         s = hashlib.sha256()

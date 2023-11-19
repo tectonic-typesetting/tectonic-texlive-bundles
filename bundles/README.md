@@ -11,7 +11,7 @@ A bundle directory contains the following:
  - `tl-profile.txt`: the TeXlive profile to install. See TeXlive docs. \
  Note that all paths are replaced with `@dest@`, which is replaced with a path by the docker build script.
  - `include/`: extra files to include in the bundle. All files are read, including those in subdirectories. \
- If a filename in `include/` conflicts with a file in TeXlive, the `include/` file is used and a warning is printed.
+ This directory may also contain diffs, see below. Files ending in `.diff` are special.
 
 
 
@@ -67,3 +67,14 @@ this regular expression. All paths are relative to texmf-dist. For example, when
  - `.*\.log`: Ignore all paths ending in `.log`
  - `fonts`: Nothing will match this pattern. All paths begin with at least a `/`
  - `/fonts`: Only the file `/fonts` will match this pattern. Subfiles of a directory called `fonts` will *not* match, because the whole string must match. The correct way to ignore the `fonts` directory is with the pattern `/fonts/.*`.
+
+
+
+## Adding files: `include/`
+
+Any files in this directory will be added to the bundle. Subdirectories are traversed and ignored (we pretend the directory structure is flat). If a filename here conflicts with a file in TeXlive, the TeXlive version is **silently** ignored.
+
+Any file that ends with `.diff` is special. If the file selector encounters `a.diff`, it will NOT copy `a.diff` into the bundle. Instead, it will apply `a.diff` when it encounters a file named `a`.
+
+To make a diff file, run `diff <texlive-file> <modified-file>`. ORDER MATTERS! \
+Diffs are applied via a simple call to `patch <file> <diff>`. See [`select-files.py`](../scripts/select-files.py).
