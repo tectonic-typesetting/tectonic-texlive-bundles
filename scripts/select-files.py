@@ -66,11 +66,23 @@ class FilePicker(object):
         # }}
         self.clashes = {}
 
+        # Number of files with conflicting file names
+        # that have the same content as the file we added to the bundle.
+        # These are not added to self.clashes.
+        self.identical_clashes = 0
+
+
+        # Hashes of files we've applied patches to
+        # (calculated before patching)
+        # This lets us detect conflicting patched files
+        # with identical contents.
+        self.pre_patch_shas = set()
+
         # Array of diff file paths in include dir.
         # Scanned at start of run, applied while running.
         # Map of "filename": Path(filename.diff)
         self.diffs = {}
-        self.diffs_applied = 0 # How many diffs we've applied
+        self.patch_applied_count = 0 # How many diffs we've applied
 
         # Length of "Patching (n)" string,
         # used only for pretty printing.
@@ -87,7 +99,7 @@ class FilePicker(object):
 
 
     # Print and pad with spaces.
-    # Used when printing while adding.
+    # Used when printing info while adding files.
     def clearprint(self, string):
         l = len(string)
         if l < self.print_len:
@@ -112,22 +124,29 @@ class FilePicker(object):
 
 
     def add_file(self, full_path: Path):
-        # Get the digest
-        with open(full_path, "rb") as f:
-            contents = f.read()
-
-        s = hashlib.sha256()
-        s.update(contents)
-        digest = s.digest()
-
         # Have we seen this filename before?
         prev_tuple = self.item_shas.get(full_path.name)
+
+        # Compute digest of original file
+        s = hashlib.sha256()
+        with open(full_path, "rb") as f:
+            content = f.read()
+        s.update(content)
+        digest = s.digest()
+
+
         if prev_tuple is None:
             # This is a new file, ok for now.
-            self.item_shas[full_path.name] = (digest, full_path)
+
+            # Edge case: this is a duplicate of a file we've already patched.
+            # This hash won't show up in self.item_shas, since that dict
+            # only contains the post-patch hash.
+            if digest in self.pre_patch_shas:
+                self.identical_clashes += 1
+                return
 
             target_path = PATH_content
-            if self.is_patched(full_path):
+            if self.has_patch(full_path):
                 target_path /= "patched" / Path(full_path.name)
             elif full_path.is_relative_to(PATH_texlive):
                 target_path /= "texlive" / full_path.relative_to(PATH_texlive)
@@ -139,9 +158,20 @@ class FilePicker(object):
             self.index[full_path.name] = target_path.relative_to(PATH_content)
             target_path.parent.mkdir(parents = True, exist_ok=True)
             shutil.copyfile(full_path, target_path)
-            self.apply_diff(target_path) # has no effect if there is no diff
 
+            # Apply patches and compute new hash
+            if self.has_patch(target_path):
+                self.apply_patch(target_path)
+                self.pre_patch_shas.add(digest)
+                s = hashlib.sha256()
+                with open(target_path, "rb") as f:
+                    s.update(f.read())
+                digest = s.digest()
 
+            self.item_shas[full_path.name] = (digest, full_path)
+
+        # Don't check contents, conflicting identical files are still a conflict.
+        # we'll have to explicitly ignore one version.
         elif prev_tuple[0] != digest:
             # We already have a file with this name and different contents
             bydigest = self.clashes.setdefault(full_path.name, {})
@@ -154,16 +184,21 @@ class FilePicker(object):
             pathlist = bydigest.setdefault(digest, [])
             pathlist.append(full_path)
 
+        else:
+            self.identical_clashes += 1
 
-    def is_patched(self, file):
+
+    def has_patch(self, file):
         return file.name in self.diffs
 
-    def apply_diff(self, file):
-        if not self.is_patched(file):
+    # Apply a patch to `file`, if one is provided.
+    # We need to copy `file` first, since patching to stdout is tricky.
+    def apply_patch(self, file):
+        if not self.has_patch(file):
             return False
 
         self.clearprint(f"Patching {file.name}")
-        self.diffs_applied += 1
+        self.patch_applied_count += 1
         subprocess.run([
             "patch",
             "--quiet",
@@ -207,8 +242,8 @@ class FilePicker(object):
         for f in PATH_texlive.rglob("*"):
 
             # Update less often so we spend fewer cycles on string manipulation.
-            # mod 153 so every digit moves (modding by 100 is boring, we get static zeros)
-            if (texlive_count+extra_count) % 153 == 0:
+            # mod 193 so every digit moves (modding by 100 is boring, we get static zeros)
+            if (texlive_count+extra_count) % 193 == 0:
                 s = f"Selecting files... ({texlive_count+extra_count})"
                 self.print_len = len(s)
                 print(s, end = "\r")
@@ -236,13 +271,14 @@ class FilePicker(object):
         print(f"\ttl files ignored:     {ignored_count}")
         print(f"\ttl files replaced:    {replaced_count}")
         print(f"\ttl filename clashes:  {len(self.clashes)}")
-        print(f"\tdiffs applied/found:  {self.diffs_applied}/{len(self.diffs)}")
+        print(f"\ttl identical clashes: {self.identical_clashes}")
+        print(f"\tdiffs applied/found:  {self.patch_applied_count}/{len(self.diffs)}")
         print( "\t===============================")
         print(f"\textra files added:    {extra_count}")
         print(f"\ttotal files:          {texlive_count+extra_count}")
         print("")
 
-        if len(self.diffs) != self.diffs_applied:
+        if len(self.diffs) != self.patch_applied_count:
             print("Warning: not all diffs were applied")
 
         # Compute content hash
