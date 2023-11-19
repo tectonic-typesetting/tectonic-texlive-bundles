@@ -27,5 +27,5 @@
 <       \reserved@a
 <     \fi
 ---
->      % Tectonic: no terminal input allowed, so this is always a fatal error.
->      \errmessage{! LaTeX Error: File `#1.#2' not found.}%
+>     % Tectonic: no terminal input allowed, so this is always a fatal error.
+>     \errmessage{! LaTeX Error: File `#1.#2' not found.}%
