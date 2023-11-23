@@ -1,6 +1,8 @@
 FROM ubuntu:20.04
 
-VOLUME /iso.img
+# Do NOT include this, iso.img is a file.
+# this directive makes a directory.
+#VOLUME /iso.img
 VOLUME /bundle/
 VOLUME /install/
 

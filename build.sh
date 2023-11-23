@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-image_name="rework-bundler"
+image_name="tectonic-bundler"
 this_dir="$(pwd)"
 build_dir="${this_dir}/build"
 
