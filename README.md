@@ -27,6 +27,8 @@ To use these tools, you will need:
 - A Rust toolchain if you want to create “indexed tar” bundles. You don’t
   need Rust if you want to create a bundle and test it locally.
 
+This repo also contains a `shell.nix` with pinned versions that contains all dependencies.
+
 
 
 
