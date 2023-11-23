@@ -1,5 +1,4 @@
-# Built from texlive2023.0r0
-# Filename texlive2023.iso
+# Built from texlive2023-20230313
 
 bundle_name="texlive2023"
 bundle_faketime="2023-10-10 00:00:00"

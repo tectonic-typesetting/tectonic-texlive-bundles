@@ -42,7 +42,7 @@ The following bundles are available:
  - `texlive/2022.0r0`: directly copied from the bundle in `master`. \
  Uses `texlive-2022.0r0`, and is probably broken.
 
- - `texlive2023-nopatch`: based on `texlive-2023.0r0`.
+ - `texlive2023-nopatch`: based on `texlive2023-20230313`.
 
 
 
