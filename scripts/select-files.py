@@ -172,7 +172,7 @@ class FilePicker(object):
 
         # Don't check contents, conflicting identical files are still a conflict.
         # we'll have to explicitly ignore one version.
-        elif prev_tuple[0] != digest:
+        else:
             # We already have a file with this name and different contents
             bydigest = self.clashes.setdefault(full_path.name, {})
 
@@ -184,8 +184,8 @@ class FilePicker(object):
             pathlist = bydigest.setdefault(digest, [])
             pathlist.append(full_path)
 
-        else:
-            self.identical_clashes += 1
+            if prev_tuple[0] == digest:
+                self.identical_clashes += 1
 
 
     def has_patch(self, file):
