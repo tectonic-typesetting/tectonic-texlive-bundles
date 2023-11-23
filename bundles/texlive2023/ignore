@@ -247,6 +247,8 @@
 /chktex/.*
 /source/.*
 /doc/.*
+
+
 # Discontinued project
 # (Why is this even in texlive?)
 /tex/lambda/.*

@@ -323,16 +323,34 @@ function make_itar() {
 
 case "${job}" in
 
-	"all")
-		container
-		install
-		select_files
-	;;
-
+	# Debugging tools
 	"shell" | "bash")
 		shell
 	;;
 
+
+	# Shortcuts
+	"all")
+		container
+		install
+		select_files
+		make_zip
+		make_itar
+	;;
+
+	"most")
+		select_files
+		make_zip
+		make_itar
+	;;
+
+	"package")
+		make_zip
+		make_itar
+	;;
+
+
+	# Single jobs
 	"container")
 		container
 	;;
