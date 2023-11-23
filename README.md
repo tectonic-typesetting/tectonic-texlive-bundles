@@ -57,7 +57,7 @@ The following bundles are available:
 ## Build Process:
 Before building any bundles, acquire a [TeXlive iso](https://tug.org/texlive/acquire-iso.html) with a version that matches the bundle you want to build. `build.sh` checks the hash of this file when you run `install`.
 
-To build a bundle, run the following jobs. This **must** be run in order!
+To build a bundle, run the following jobs. These **must** be run in order!
 
  - `./build.sh container`: builds the docker container from `./docker`
  - `./build.sh <bundle> install <iso>`: installs TeXLive to `./build/install/`
@@ -141,5 +141,5 @@ Below is a list of "problem files" that have made bit-perfect rebuilds difficult
    - `b4a1d8ccc0c60e24e909f01c247f0a0f.luc`
 
 Fortunately, installing TeXlive with `faketime -f` seems to pin both UUIDs and timestamps.\
-The date each bundle is built on is defined in its specification.
+The date each bundle is built at is defined in its specification.
 
