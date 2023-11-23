@@ -59,24 +59,24 @@ Before building any bundles, acquire a [TeXlive iso](https://tug.org/texlive/acq
 
 To build a bundle, run the following jobs. This **must** be run in order!
 
- - `./build container`: builds the docker container from `./docker`
- - `./build <bundle> install <iso>`: installs TeXLive to `./build/install/`
- - `./build <bundle> content`: assemble all files into a bundle at `./build/output/content`.\
+ - `./build.sh container`: builds the docker container from `./docker`
+ - `./build.sh <bundle> install <iso>`: installs TeXLive to `./build/install/`
+ - `./build.sh <bundle> content`: assemble all files into a bundle at `./build/output/content`.\
   This will delete all bundles in `output/<bundle>/`, move them elsewhere if you still need them.
 
 Once `./build/output/content` has been created, run any of the following commands to package the bundle:
 
- - `./build <bundle> zip`: create a zip bundle from the content directory.\
+ - `./build.sh <bundle> zip`: create a zip bundle from the content directory.\
   Zip bundles can only be used locally, they may not be hosted on the web.
 
- - `./build <bundle> itar`: create an indexed tar bundle from the content directory. \
+ - `./build.sh <bundle> itar`: create an indexed tar bundle from the content directory. \
  These cannot be used locally, itar bundles must be used as web bundles. \
  If you want to host your own, you'll need to put `bundle.tar` and `<bundle>.tar.sha256sum` under the same url.
 
 `build.sh` also provides a few shortcuts:
- - `./build <bundle> all <iso>`: Runs all the above jobs, *including* a full re-install.
- - `./build <bundle> most <iso>`: Runs all jobs except `container` and `install`.
- - `./build <bundle> package`: Runs `zip` and `itar`. Assumes `content` has already been run.
+ - `./build.sh <bundle> all <iso>`: Runs all the above jobs, *including* a full re-install.
+ - `./build.sh <bundle> most <iso>`: Runs all jobs except `container` and `install`.
+ - `./build.sh <bundle> package`: Runs `zip` and `itar`. Assumes `content` has already been run.
 
 
 
