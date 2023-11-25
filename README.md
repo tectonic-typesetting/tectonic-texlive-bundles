@@ -99,11 +99,10 @@ Once `./build/output/content` has been created, run any of the following command
 
 **`./build.sh <bundle> content` produces the following:**
  - `./build/output/<bundle>/content`: contains all bundle files. This directory also contains some metadata:
-   - `content/INDEX`: each line of this file maps a filename in the bundle to a relative path.
+   - `content/INDEX`: each line of this file maps a filename in the bundle to a full path. Duplicate filenames are included.
    - `content/SHA256SUM`: a hash of this bundle's contents.
    - `content/TEXLIVE-SHA265SUM`: a hash of the TeXlive image used to build this bundle.
- - `listing`: a sorted list of all files in the bundle
- - `clash-report`: debug file. did any files have the same name? (if any)
+ - `search-report`: debug file. Lists all filenames that will be resolved alphabetically.
  - `file-hashes`: debug file. Indexes the contents of the bundle. Used to find which files differ between two builds.
   `file-hashes` and `content/SHA265SUM` are generated in roughly the same way, so the `file-hashes` files from two different bundles should match if and only if the two bundles have the same sha256sum
 
