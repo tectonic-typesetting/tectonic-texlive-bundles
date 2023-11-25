@@ -230,9 +230,16 @@ function make_zip() {
 	# Output will be smaller than input!
 	echo "Making zip bundle from content directory..."
 	local size=$(du -bs "${output_dir}/content" | awk '{print $1}')
-	zip -qjr - "${output_dir}/content" | \
-		pv -berw 40 -s $size \
-		> "${zip_path}"
+
+	(
+		# cd so paths are relative,
+		# subshell so cd is local.
+		cd "${output_dir}/content"
+		zip -qr - "." | \
+			pv -bea -s $size \
+			> "${zip_path}"
+	)
+
 	echo "Done."
 	echo ""
 }
