@@ -35,14 +35,14 @@ def get_var(varname):
     return p.stdout.readlines()[0].strip().decode("utf-8")
 
 VAR_bundlename = get_var('bundle_name')
+VAR_texlive = get_var('bundle_texlive_name')
 
 
 
 # Input paths
 PATH_ignore  = PATH_bundle / "ignore"
 PATH_extra   = PATH_bundle / "include"
-PATH_install = Path(f"build/install/{VAR_bundlename}")
-PATH_texlive = PATH_install / "texmf-dist"
+PATH_texlive = Path(f"build/texlive/{VAR_texlive}")
 
 # Output paths
 PATH_output  = Path(f"build/output/{VAR_bundlename}")
@@ -294,11 +294,6 @@ class FilePicker(object):
         # Write bundle metadata
         with (PATH_content / "SHA256SUM").open("w") as f:
             f.write(self.final_hexdigest)
-        if (PATH_install / "TEXLIVE-SHA256SUM").is_file():
-            shutil.copyfile(
-                PATH_install / "TEXLIVE-SHA256SUM",
-                PATH_content / "TEXLIVE-SHA256SUM"
-            )
         with (PATH_content / "INDEX").open("w") as f:
             for k, p in sorted(self.index.items(), key = lambda x: x[0]):
                 f.write(f"{k} {p}\n")
