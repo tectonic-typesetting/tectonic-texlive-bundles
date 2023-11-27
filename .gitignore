@@ -5,4 +5,5 @@ __pycache__/
 /tests/build
 
 *.ignore
-*.iso
+*.tar
+*.tar.xz
