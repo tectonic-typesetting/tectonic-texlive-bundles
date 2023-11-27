@@ -281,7 +281,7 @@ case "${2}" in
 		make_itar "${1}"
 	;;
 
-	"package")
+	"package" | "packages")
 		# All packages
 		make_zip "${1}"
 		make_itar "${1}"
