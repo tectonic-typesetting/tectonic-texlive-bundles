@@ -18,17 +18,15 @@ A bundle directory contains the following:
 
 
 ## Metadata: `bundle.sh`
-An example file with comments is below. All the variables below must be present. This is enforced by `./build.sh`, make sure you update the checks there if you add any variables.
+An example file with comments is below. All the variables below must be present. This is enforced by `./build.sh`.
 ```sh
 # This bundle's name. Should probably match subdirectory.
 bundle_name="texlive2023.0r0"
 
-# Fake time for texlive installation.
-# Changing this will change the output hash.
-# Format must be "YYYY-MM-DD HH:MM:SS".
-# Make sure this is dated AFTER the texlive release,
-# otherwise tar will complain about future timestamps.
-bundle_faketime="2023-10-10 00:00:00"
+
+# The name of the texlive tar file that should be used for this bundle.
+# this is *essential* to the build process, make sure it is correct!
+bundle_texlive_name="texlive-20230313-texmf"
 
 # Compute this hash by running `sha256 -b file.iso`
 # If this is an empty string, hash is not checked.
@@ -68,6 +66,7 @@ this regular expression. All paths are relative to texmf-dist. For example, when
  - `.*\.log`: Ignore all paths ending in `.log`
  - `fonts`: Nothing will match this pattern. All paths begin with at least a `/`
  - `/fonts`: Only the file `/fonts` will match this pattern. Subfiles of a directory called `fonts` will *not* match, because the whole string must match. The correct way to ignore the `fonts` directory is with the pattern `/fonts/.*`.
+
 
 
 

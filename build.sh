@@ -5,58 +5,17 @@ this_dir="$(pwd)"
 build_dir="${this_dir}/build"
 
 
-
-function help () {
-	echo "Invalid build command."
-	echo "Usage: ./build.sh <bundle> <job> <iso>"
-	echo "See README.md for detailed documentation."
-	exit 1
-}
-
+# Print relative path.
+# Only used for pretty printing.
 function relative() {
 	echo "./$(realpath --relative-to="${this_dir}" "${1}")"
 }
 
 
+# Load and check bundle metadata.
+function load_bundle() {
+	local bundle_dir="${1}"
 
-# Set up and check arguments.
-if [[ "${1}" == "container" ]]; then
-	# "container" is a special case, since it takes no arguments.
-	# Note that `.build.sh <bundle> container` works and has the
-	# same effect as `./build.sh container`
-
-	job="container"
-	target_bundle=""
-	iso_file=""
-else
-	# Which bundle specification are we building?
-	# This is a path to a bundle directory, probably one in ./bundles
-	bundle_dir="$(realpath "${1}")"
-	shift
-
-	# What do we want to do?
-	job="${1}"
-	shift
-
-	# The image to build from.
-	# This arg is optional for some jobs.
-	iso_file="${1}"
-	if [[ "${iso_file}" != "" ]] ; then
-		iso_file="$(realpath "${iso_file}")"
-	fi
-	shift
-
-	# Make sure args are valid.
-	# We don't check iso_file here, since it's only required for some jobs.
-	if [[
-		"${bundle_dir}" == "" ||
-		"${job}" == ""
-	]] ; then
-		help
-	fi
-
-
-	# Load and check bundle metadata
 	if [ ! -d "$bundle_dir" ]; then
 		echo >&2 "[ERROR] $(relative "${bundle_dir}") doesn't exist, cannot proceed."
 		exit 1
@@ -69,47 +28,12 @@ else
 	if [[
 		-z ${bundle_name+x} ||
 		-z ${bundle_texlive_hash+x} ||
-		-z ${bundle_faketime+x} ||
+		-z ${bundle_texlive_name+x} ||
 		-z ${bundle_result_hash+x}
 	]] ; then
 		echo >&2 "[ERROR] Bundle config is missing values, check bundle.sh"
 		exit 1
 	fi
-	unset target_bundle
-
-
-	# Set up paths
-	install_dir="${build_dir}/install/${bundle_name}"
-	output_dir="${build_dir}/output/${bundle_name}"
-	# Must match path in make-zipfile.py
-	zip_path="${output_dir}/${bundle_name}.zip"
-fi
-
-
-function needs_iso() {
-	if [[ "$iso_file" == "" ]]; then
-		echo "You must provide a texlive image to run this job."
-		exit 1
-	fi
-
-	if [[ ! -f "$iso_file" ]]; then
-		echo "TeXlive iso $(relative "${iso_file}") doesn't exist!"
-		exit 1
-	fi
-}
-
-
-
-# Build the docker container in ./docker
-function container() {
-	local tag=$(date +%Y%m%d)
-	docker build -t $image_name:$tag docker/
-	docker tag $image_name:$tag $image_name:latest
-
-	if [[ "${job}" == "container" ]]; then
-		exit 0
-	fi
-	echo ""
 }
 
 
@@ -118,121 +42,132 @@ function container() {
 
 # Job implementations are below
 # (In the order we need to run them)
+#
+# These functions take no implicit parameters.
+# All arguments are provided explicitly.
 
 
 
 
-# Run a shell in our container
-# Only used to debug the build process.
-function shell() {
-	needs_iso
-	mkdir -p "${install_dir}"
+# Extract the TeXLive tarball into /build/texlive.
+# Arguments:
+#	$1: source tarball
+function extract_texlive() {
+	local tar_file="${1}"
 
-	local docker_args=(
-		--privileged
-		-e HOSTUID=$(id -u)
-		-e HOSTGID=$(id -g)
-		-v "$iso_file":/iso.img:ro,z
-		-v "$install_dir":/install:rw,z
-		-v "$bundle_dir":/bundle:ro,z
-	)
-
-	docker run -it --rm "${docker_args[@]}" $image_name bash
-	exit 0
-}
-
-
-
-# Install texlive in /build/install using our container
-# If $1 is "nohash", don't check iso hash before build.
-function install() {
-	needs_iso
-
-	local docker_args=(
-		--privileged
-		-e HOSTUID=$(id -u)
-		-e HOSTGID=$(id -g)
-		-v "$iso_file":/iso.img:ro,z
-		-v "$install_dir":/install:rw,z
-		-v "$bundle_dir":/bundle:ro,z
-	)
-
-
-	# We need this even if we're not checking the hash,
-	# since this information is saved to the bundle.
-	echo "Hashing TeXlive iso..."
-	local iso_hash=$( sha256sum -b "$iso_file" | awk '{ print $1 }' )
-	echo "Done: ${iso_hash}"
-
-	# Check texlive iso hash
-	if [[ "${1}" != "nohash" ]]; then
-		if [[ "${bundle_texlive_hash}" == "" ]]; then
-			echo "Not checking TeXlive hash, bundle doesn't provide one."
-			echo "Continuing..."
-			sleep 1
-		else
-			echo "Checking iso hash against $(relative "${bundle_dir}")..."
-			if [[ "${iso_hash}" == "${bundle_texlive_hash}" ]]; then
-				echo "OK: hash matches."
-			else
-				echo "Error: checksums do not match."
-				echo ""
-				echo "Got       $iso_hash"
-				echo "Expected  $bundle_texlive_hash"
-				exit 1
-			fi
-			echo ""
-		fi
+	if [[ "$tar_file" == "" ]]; then
+		echo "You must provide a texlive image to run this job."
+		exit 1
 	fi
 
+	if [[ ! -f "$tar_file" ]]; then
+		echo "TeXlive iso $(relative "${tar_file}") doesn't exist!"
+		exit 1
+	fi
 
-	mkdir -p "${install_dir}"
-	# Remove install dir if it already exists
-	if [[ ! -z "$(ls -A "${install_dir}")" ]]; then
-		echo "Install directory is $(relative "${install_dir}")"
+	local texlive_dir="${build_dir}/texlive/${tar_file%.tar}"
+
+
+	mkdir -p "${texlive_dir}"
+	chmod a+w -R "${texlive_dir}"
+	# Remove target dir if it already exists
+	if [[ ! -z "$(ls -A "${texlive_dir}")" ]]; then
+		echo "Target directory is $(relative "${texlive_dir}")"
 		for i in {5..2}; do
-			echo "[WARNING] Install directory isn't empty, deleting in $i seconds..."
+			echo -en "[WARNING] Target directory isn't empty, deleting in $i seconds...\r"
 			sleep 1
 		done
-		echo "[WARNING] Install directory isn't empty, deleting in 1 second..."
+		echo -en "[WARNING] Target directory isn't empty, deleting in 1 second... \r"
 		sleep 1
 
-		echo "Running \`rm -drf "${install_dir}"\`"
-		rm -drf "${install_dir}"
+		echo -e "\nRunning \`rm -drf "${texlive_dir}"\`"
+		rm -drf "${texlive_dir}"
 		echo ""
 	fi
-	mkdir -p "${install_dir}"
+	mkdir -p "${texlive_dir}"
+
+	# We store this tar hash inside the target directory, and inside each bundle.
+
+	local tar_hash=$(
+		pv -N "Hashing TeXLive tar" -berw 60 "${tar_file}" | \
+		sha256sum -b - | awk '{ print $1 }'
+	)
+	echo "Done: ${tar_hash}"
 
 
-	echo "It is $(date +%H:%M:%S)"
-	docker run -it --rm "${docker_args[@]}" $image_name install
+	pv -N "Extracting tarball" -berw 60 "${tar_file}" | \
+		tar -x \
+			--directory="${texlive_dir}" \
+			--strip-components=2 \
+			"${tar_file%.tar}/texmf-dist"
 
 
 	if [[ $? != 0 ]]; then
-		echo "Install failed"
+		echo "TeXLive extraction failed"
 		exit 1
 	fi
 
 	# Record iso hash
-	echo "${iso_hash}" > "${install_dir}/TEXLIVE-SHA256SUM"
+	echo "${tar_hash}" > "${texlive_dir}/TEXLIVE-SHA256SUM"
+	chmod a-w -R "${texlive_dir}"
 
 	echo ""
 }
 
 
 # Select files for this bundle
+# Arguments:
+#	$1: bundle specification
 function select_files() {
+	local bundle_dir="${1}"
+	load_bundle "${bundle_dir}"
+
+	local texlive_dir="build/texlive/${bundle_texlive_name}"
+	local output_dir="${build_dir}/output/${bundle_name}"
+
+	if [[ ! -d "${texlive_dir}" ]]; then
+		echo "TeXLive source for \"${bundle_texlive_name}\" doesn't exist."
+		echo "You may have forgotten to run \`./bundle.sh extract\`"
+		exit 1
+	fi
+
+	local tar_hash="$(cat "${texlive_dir}/TEXLIVE-SHA256SUM")"
+
+	# Check texlive iso hash
+	if [[ "${nohash}" != "nohash" ]]; then
+		if [[ "${bundle_texlive_hash}" == "" ]]; then
+			echo "Not checking TeXlive hash, bundle doesn't provide one."
+			echo "Continuing..."
+			sleep 1
+		else
+			echo "Checking extracted hash against $(relative "${bundle_dir}")..."
+			if [[ "${tar_hash}" == "${bundle_texlive_hash}" ]]; then
+				echo "OK: hash matches."
+			else
+				echo "Error: checksums do not match."
+				echo ""
+				echo "Got       $tar_hash"
+				echo "Expected  $bundle_texlive_hash"
+				echo ""
+				echo "This is a critical error. Edit the bundle specification"
+				echo "if you'd like to use a different file."
+				exit 1
+			fi
+			echo ""
+		fi
+	fi
+
 	mkdir -p "${output_dir}"
 	if [ ! -z "$(ls -A "${output_dir}")" ]; then
 		echo "Output directory is $(relative "${output_dir}")"
 		for i in {5..2}; do
-			echo "[WARNING] Output directory isn't empty, deleting in $i seconds..."
+			echo -en "[WARNING] Output directory isn't empty, deleting in $i seconds...\r"
 			sleep 1
 		done
-		echo "[WARNING] Output directory isn't empty, deleting in 1 second..."
+		echo -en "[WARNING] Output directory isn't empty, deleting in 1 second... \r"
 		sleep 1
 
-		echo "Running \`rm -drf "${output_dir}"\`"
+		echo -e "\nRunning \`rm -drf "${output_dir}"\`"
 		rm -drf "${output_dir}"
 		echo ""
 	fi
@@ -259,21 +194,27 @@ function select_files() {
 				echo "[WARNING] content hash does not match expected hash"
 				echo "got      \"${content_hash}\""
 				echo "expected \"${bundle_result_hash}\""
-				echo ""
-				echo "Build has been stopped, but files have been selected."
-				echo "Run \`./build.sh $(relative "${bundle_dir}") zip\` to continue."
-				exit 1
 			else
 				echo "File selection done, hash matches."
 			fi
 		fi
 	fi
+	echo ""
 }
 
 
 
-# Make zip bundle from content directory
+# Make a zip bundle from the content directory
+# Arguments:
+#	$1: bundle specification
 function make_zip() {
+	local bundle_dir="${1}"
+	load_bundle "${bundle_dir}"
+	local output_dir="${build_dir}/output/${bundle_name}"
+	local zip_path="${output_dir}/${bundle_name}.zip"
+	rm -f "${zip_path}"
+
+
 	if [ -z "$(ls -A "${output_dir}/content")" ]; then
 		echo "Bundle content directory doesn't exist at $(relative "${output_dir}/content")"
 		echo "Cannot proceed. Run \`./build.sh $(relative "${bundle_dir}") content\`, then try again."
@@ -292,10 +233,10 @@ function make_zip() {
 
 	(
 		# cd so paths are relative,
-		# subshell so cd is local.
 		cd "${output_dir}/content"
+
 		zip -qr - "." | \
-			pv -bea -s $size \
+			pv -berw 40 -s $size \
 			> "${zip_path}"
 	)
 
@@ -305,84 +246,77 @@ function make_zip() {
 
 
 
-
-
-# Convert zip bundle to an indexed tar bundle
+# Make an itar bundle from the content directory
+# Arguments:
+#	$1: bundle specification
 function make_itar() {
-	mkdir -p "${output_dir}"
-
+	local bundle_dir="${1}"
+	load_bundle "${bundle_dir}"
+	local output_dir="${build_dir}/output/${bundle_name}"
 	local tar_path="${output_dir}/${bundle_name}.tar"
-	rm -f "$tar_path"
 
-	echo "Generating $(relative "${tar_path}")..."
- 
-	cd "scripts/zip2tarindex"
-	
-	# all paths are absolute, so this should work even after `cd`
-	exec cargo run --release -- "${output_dir}/content" "$tar_path"
+	rm -f "${tar_path}"
+
+	# Subshell so cd is local
+	(
+		cd "scripts/zip2tarindex"
+
+		echo -n "Compiling zip2tarindex..."
+		cargo build --quiet --release
+		echo " Done!"
+
+		echo -n "Generating $(relative "${tar_path}")..."
+		cargo run --quiet --release -- \
+			"${output_dir}/content" "${tar_path}"
+		echo " Done!"
+	)
 	echo ""
-
-	cd "$this_dir"
 }
 
 
 
+# We use the slightly unusual ordering `./build.sh <arg> <job>`
+# so that it's easier to change the job we're running on a bundle
 
-case "${job}" in
-
-	# Debugging tools
-	"shell" | "bash")
-		shell
-	;;
-
+case "${2}" in
 
 	# Shortcuts
-	"all")
-		container
-		install
-		select_files
-		make_zip
-		make_itar
-	;;
-
 	"most")
-		select_files
-		make_zip
-		make_itar
+		# Everything except installation
+		select_files "${1}"
+		make_zip "${1}"
+		make_itar "${1}"
 	;;
 
-	"package")
-		make_zip
-		make_itar
+	"package" | "packages")
+		# All packages
+		make_zip "${1}"
+		make_itar "${1}"
 	;;
+
 
 
 	# Single jobs
-	"container")
-		container
+	"extract")
+		extract_texlive "${1}"
 	;;
 
-	"install")
-		install
-	;;
-
-	"forceinstall")
-		install nohash
-	;;
-
-	"select" | "content")
-		select_files
+	"content")
+		select_files "${1}"
 	;;
 
 	"zip")
-		make_zip
+		make_zip "${1}"
 	;;
 
 	"itar")
-		make_itar
+		make_itar "${1}"
 	;;
 
 	*)
-		help
+		echo "Invalid build command."
+		echo "Usage: ./build.sh <bundle> <job>"
+		echo "See README.md for detailed documentation."
+		exit 1
 	;;
 esac

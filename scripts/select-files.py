@@ -35,13 +35,13 @@ def get_var(varname):
     return p.stdout.readlines()[0].strip().decode("utf-8")
 
 VAR_bundlename = get_var('bundle_name')
+VAR_texlive = get_var('bundle_texlive_name')
 
 
 # Input paths
 PATH_ignore  = PATH_bundle / "ignore"
 PATH_extra   = PATH_bundle / "include"
-PATH_install = Path(f"build/install/{VAR_bundlename}")
-PATH_texlive = PATH_install / "texmf-dist"
+PATH_texlive = Path(f"build/texlive/{VAR_texlive}")
 
 # Output paths
 PATH_output  = Path(f"build/output/{VAR_bundlename}")
@@ -73,7 +73,7 @@ def resolve_filename_conflict(search, paths):
 
         if resolved:
             break
-    
+
     return resolved
 
 
@@ -263,7 +263,7 @@ class FilePicker(object):
 
         if len(self.diffs) < self.patch_applied_count:
             print("Warning: some diffs were applied multiple times!")
-        
+
         print("Preparing auxillary files...", end = "")
 
         # Sort to guarantee a reproducible hash.
@@ -281,7 +281,6 @@ class FilePicker(object):
                 s.update(b"\0")
                 s.update(d)
                 s.update(b"\0")
-
             f.write(s.hexdigest())
 
         # This is essentially a detailed version of SHA256SUM,
