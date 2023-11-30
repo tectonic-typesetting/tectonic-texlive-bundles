@@ -1,5 +1,5 @@
 __pycache__/
-/scripts/zip2tarindex/target/
+/scripts/*/target/
 
 /build
 /tests/build
