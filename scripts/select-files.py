@@ -54,7 +54,7 @@ PATH_content = PATH_output / "content"
 #
 # We don't actually pick a path here, we just decide whether or not we
 # *can*, given the current rules.
-def resolve_filename_conflict(search, paths):
+def search_for_file(search, paths):
     resolved = False
     for rule in search:
         for path in paths:
@@ -93,8 +93,8 @@ class FilePicker(object):
         # We may have repeating file names.
         self.index = {}
 
-        # Array of ( hash, Path )
-        self.item_shas = []
+        # Dict of ( Path: hash )
+        self.item_shas = {}
 
         # All filenames added from include dir
         self.extra_basenames = set()
@@ -168,7 +168,7 @@ class FilePicker(object):
                 s.update(f.read())
             digest = s.digest()
 
-        self.item_shas.append((digest, full_path))
+        self.item_shas[target_path.relative_to(PATH_content)] = digest
 
 
     def has_patch(self, file):
@@ -266,17 +266,20 @@ class FilePicker(object):
 
         print("Preparing auxillary files...", end = "")
 
+
+        item_shas = list(self.item_shas.items())
+
         # Sort to guarantee a reproducible hash.
         # Note that the files created below are not hashed!
-        self.item_shas.sort(
-            key = lambda x: x[1].name + x[0].hex()
+        item_shas.sort(
+            key = lambda x: x[0].name + x[1].hex()
         )
 
         # Compute and save hash
         self.index["SHA256SUM"] = ["SHA256SUM"]
         with (PATH_content / "SHA256SUM").open("w") as f:
             s = hashlib.sha256()
-            for d, p in self.item_shas:
+            for p, d in item_shas:
                 s.update(p.name.encode("utf8"))
                 s.update(b"\0")
                 s.update(d)
@@ -286,10 +289,10 @@ class FilePicker(object):
         # This is essentially a detailed version of SHA256SUM,
         # Good for finding file differences between bundles
         with (PATH_output / "file-hashes").open("w") as f:
-            for h, p in self.item_shas:
+            for p, d in item_shas:
                 f.write(str(p))
                 f.write("\t")
-                f.write(h.hex())
+                f.write(d.hex())
                 f.write("\n")
 
 
@@ -305,12 +308,11 @@ class FilePicker(object):
             with (PATH_content / "SEARCH").open("r") as f:
                 search = [x.strip() for x in f.readlines()]
                 for name, paths in sorted(self.index.items(), key = lambda x: x[0]):
-                    if len(paths) != 1:
-                        if not resolve_filename_conflict(search, paths):
-                            l.write("No rule to resolve:\n")
-                            for p in paths:
-                                l.write(f"\t{p}\n")
-                            l.write("\n\n")
+                    if not search_for_file(search, paths):
+                        l.write("Will not find:\n")
+                        for p in paths:
+                            l.write(f"\t{p}\n")
+                        l.write("\n\n")
 
         #if (PATH_install / "TEXLIVE-SHA256SUM").is_file():
         #     shutil.copyfile(
@@ -324,8 +326,12 @@ class FilePicker(object):
         self.index["INDEX"] = ["INDEX"]
         with (PATH_content / "INDEX").open("w") as f:
             for name, paths in sorted(self.index.items(), key = lambda x: x[0]):
-                for p in paths:
-                    f.write(f"{name} {p}\n")
+                for p in sorted(paths):
+                    digest = self.item_shas.get(p)
+                    if digest is None:
+                        f.write(f"{name} {p} nohash\n")
+                    else:
+                        f.write(f"{name} {p} {digest.hex()}\n")
 
         print(" Done.")
 
