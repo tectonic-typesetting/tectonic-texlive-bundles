@@ -52,7 +52,7 @@ impl FilePicker {
             // Paths
             include: bundle_dir.join("include"),
             content: build_dir.join("output").join(&bundle_name).join("content"),
-            output: build_dir.join("output"),
+            output: build_dir.join("output").join(&bundle_name),
 
             // Various arrays
             index: HashMap::new(),
