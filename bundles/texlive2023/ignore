@@ -28,42 +28,42 @@
 
 # I don't think tectonic has xindy support.
 # Ignore for now, causes many conflicts
-/xindy/.*
+/texlive/xindy/.*
 
 # We may need this, but exclude for now.
 # Also causes many conflicts.
-/tex4ht/.*
+/texlive/tex4ht/.*
 
 # These require pLaTeX2e, tectonic uses XeTeX
-/tex/uplatex/.*
-/tex/uptex/.*
+/texlive/tex/uplatex/.*
+/texlive/tex/uptex/.*
 
 
 # Other odd tex formats & unnecessary files
-/tex/cslatex/.*
-/tex/csplain/.*
-/tex/ptex/.*
-/tex/platex/.*
-/tex/lollipop/.*
-/tex/context/.*
-/context/.*
-/texdoc/.*
-/texdoctk/.*
-/texconfig/.*
-/scripts/.*
-/dvips/.*
-/asymptote/.*
-/makeindex/.*
-/luatex-cache/.*
-/hb2gf/.*
-/chktex/.*
-/source/.*
-/doc/.*
-/tex/luatex/.*
-/tex/lualatex/.*
+/texlive/tex/cslatex/.*
+/texlive/tex/csplain/.*
+/texlive/tex/ptex/.*
+/texlive/tex/platex/.*
+/texlive/tex/lollipop/.*
+/texlive/tex/context/.*
+/texlive/context/.*
+/texlive/texdoc/.*
+/texlive/texdoctk/.*
+/texlive/texconfig/.*
+/texlive/scripts/.*
+/texlive/dvips/.*
+/texlive/asymptote/.*
+/texlive/makeindex/.*
+/texlive/luatex-cache/.*
+/texlive/hb2gf/.*
+/texlive/chktex/.*
+/texlive/source/.*
+/texlive/doc/.*
+/texlive/tex/luatex/.*
+/texlive/tex/lualatex/.*
 
 
 # Discontinued project
 # (Why is this even in texlive?)
-/tex/lambda/.*
-/omega/.*
+/texlive/tex/lambda/.*
+/texlive/omega/.*

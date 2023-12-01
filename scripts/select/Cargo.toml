@@ -1,0 +1,10 @@
+[package]
+name = "select"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+sha256 = "1.4.0"
+regex = "1.10.2"
+walkdir = "2"

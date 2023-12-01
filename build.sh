@@ -4,7 +4,6 @@ image_name="tectonic-bundler"
 this_dir="$(pwd)"
 build_dir="${this_dir}/build"
 
-
 # Print relative path.
 # Only used for pretty printing.
 function relative() {
@@ -119,7 +118,8 @@ function extract_texlive() {
 # Arguments:
 #	$1: bundle specification
 function select_files() {
-	local bundle_dir="${1}"
+	# cargo run needs an absolute path
+	local bundle_dir="$(realpath "${1}")"
 	load_bundle "${bundle_dir}"
 
 	local texlive_dir="build/texlive/${bundle_texlive_name}"
@@ -134,27 +134,25 @@ function select_files() {
 	local tar_hash="$(cat "${texlive_dir}/TEXLIVE-SHA256SUM")"
 
 	# Check texlive iso hash
-	if [[ "${nohash}" != "nohash" ]]; then
-		if [[ "${bundle_texlive_hash}" == "" ]]; then
-			echo "Not checking TeXlive hash, bundle doesn't provide one."
-			echo "Continuing..."
-			sleep 1
+	if [[ "${bundle_texlive_hash}" == "" ]]; then
+		echo "Not checking TeXlive hash, bundle doesn't provide one."
+		echo "Continuing..."
+		sleep 1
+	else
+		echo "Checking extracted hash against $(relative "${bundle_dir}")..."
+		if [[ "${tar_hash}" == "${bundle_texlive_hash}" ]]; then
+			echo "OK: hash matches."
 		else
-			echo "Checking extracted hash against $(relative "${bundle_dir}")..."
-			if [[ "${tar_hash}" == "${bundle_texlive_hash}" ]]; then
-				echo "OK: hash matches."
-			else
-				echo "Error: checksums do not match."
-				echo ""
-				echo "Got       $tar_hash"
-				echo "Expected  $bundle_texlive_hash"
-				echo ""
-				echo "This is a critical error. Edit the bundle specification"
-				echo "if you'd like to use a different file."
-				exit 1
-			fi
+			echo "Error: checksums do not match."
 			echo ""
+			echo "Got       $tar_hash"
+			echo "Expected  $bundle_texlive_hash"
+			echo ""
+			echo "This is a critical error. Edit the bundle specification"
+			echo "if you'd like to use a different file."
+			exit 1
 		fi
+		echo ""
 	fi
 
 	mkdir -p "${output_dir}"
@@ -173,7 +171,21 @@ function select_files() {
 	fi
 	mkdir -p "${output_dir}"
 
-	python3 scripts/select-files.py "${bundle_dir}"
+	(
+		cd "scripts/select"
+		cargo build --quiet --release
+
+		# This requires a few envvars,
+		# see main.rs
+		export bundle_name
+		export bundle_texlive_hash
+		export bundle_texlive_name
+		export bundle_result_hash
+		#
+		export bundle_dir
+		export build_dir
+		cargo run --quiet --release
+	)
 	if [[ $? != 0 ]]; then
 		echo "File selector failed"
 		exit 1
@@ -201,7 +213,6 @@ function select_files() {
 	fi
 	echo ""
 }
-
 
 
 # Make a zip bundle from the content directory
