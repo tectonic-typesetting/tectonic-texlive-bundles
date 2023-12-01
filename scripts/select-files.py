@@ -299,7 +299,7 @@ class FilePicker(object):
         # Save search order
         self.index["SEARCH"] = ["SEARCH"]
         shutil.copyfile(
-            PATH_bundle / "search-paths",
+            PATH_bundle / "search-order",
             PATH_content / "SEARCH"
         )
 

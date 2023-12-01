@@ -8,7 +8,7 @@ Back to [`README.md`](../README.md)
 A bundle directory contains the following:
  - `bundle.sh`: bundle metadata, stored in bash variables
  - `ignore`: ignore patterns. TeXlive installation files matching any of these will not be included in the bundle.
- - `search-paths`: directory "search order." These rules influences how tectonic resolves filename conflicts.
+ - `search-order`: These rules influence how tectonic resolves filename conflicts.
  - `tl-profile.txt`: the TeXlive profile to install. See TeXlive docs. \
  Note that all paths are replaced with `@dest@`, which is replaced with a path by the docker build script.
  - `include/`: extra files to include in the bundle. All files are read, including those in subdirectories. \
@@ -81,7 +81,7 @@ Diffs are applied via a simple call to `patch <file> <diff>`. See [`select-files
 
 
 
-## Finding files: `search-paths`
+## Finding files: `search-order`
 
 ### Overview
 
@@ -115,7 +115,7 @@ Any filename conflicts which would be resolved alphabetically are listed in `sea
 
 ### Defining search paths
 
-Search paths are defined in `<bundle>/search-paths`. This file is directly copied into `SEARCH` in the bundle.\
+Search paths are defined in `<bundle>/search-order`. This file is directly copied into `SEARCH` in the bundle.\
 It is a simple list of paths, relative to the bundle root directory, ordered by decreasing priority.
 
 Just like kpathsea search paths, each line can end with one or two slashes.
