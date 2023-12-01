@@ -1,16 +1,16 @@
 use std::{
     collections::{HashMap, HashSet},
     env,
+    error::Error,
     fs::{self, File},
     io::{stdout, Write},
     path::{Path, PathBuf},
-    process::Command
+    process::Command,
 };
 
 use regex::Regex;
 use sha256::try_digest;
 use walkdir::WalkDir;
-
 
 #[derive(Default)]
 struct PickStatistics {
@@ -47,8 +47,8 @@ macro_rules! add_to_index {
 }
 
 impl FilePicker {
-    fn new(bundle_dir: &Path, build_dir: &Path, bundle_name: &str) -> Self {
-        FilePicker {
+    fn new(bundle_dir: &Path, build_dir: &Path, bundle_name: &str) -> Result<Self, &'static str> {
+        Ok(FilePicker {
             // Paths
             include: bundle_dir.join("include"),
             content: build_dir.join("output").join(&bundle_name).join("content"),
@@ -60,6 +60,17 @@ impl FilePicker {
             extra_basenames: HashSet::new(),
             diffs: HashMap::new(),
 
+            search: fs::read_to_string(&bundle_dir.join("search-order"))
+                .unwrap_or("".to_string())
+                .split("\n")
+                .map(|x| String::from(x.trim()))
+                .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
+                .map(|x| Self::expand_search_line(x))
+                .collect::<Result<Vec<Vec<String>>, &'static str>>()?
+                .into_iter()
+                .flatten()
+                .collect(),
+
             ignore_patterns: fs::read_to_string(bundle_dir.join("ignore"))
                 .unwrap_or("".to_string())
                 .split("\n")
@@ -68,16 +79,48 @@ impl FilePicker {
                 .map(|x| Regex::new(&format!("^{x}$")).unwrap())
                 .collect(),
 
-            search: fs::read_to_string(bundle_dir.join("search-order"))
-                .unwrap_or("".to_string())
-                .split("\n")
-                .map(|x| String::from(x.trim()))
-                .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
-                .collect(),
-
             stats: PickStatistics::default(),
             last_print_len: 0,
+        })
+    }
+
+    // Transform a search order file with shortcuts
+    // (bash-like brace expansion, like `/a/b/{tex,latex}/c`)
+    // into a plain list of strings.
+    fn expand_search_line(s: String) -> Result<Vec<String>, &'static str> {
+        if !(s.contains('{') || s.contains('}')) {
+            return Ok(vec![s]);
         }
+
+        let first = s.find("{").ok_or("Bad search path format")?;
+        let last = s.find("}").ok_or("Bad search path format")?;
+
+        let head = &s[..first];
+        let mid = &s[first + 1..last];
+
+        if mid.contains('{') || mid.contains('}') {
+            // Mismatched or nested braces
+            return Err("Bad search path format");
+        }
+
+        // We find the first brace, so only tail may have other expansions.
+        let tail = Self::expand_search_line(s[last + 1..s.len()].to_owned())?;
+
+        if mid.len() == 0 {
+            return Err("Bad search path format");
+        }
+
+        let mut output: Vec<String> = Vec::new();
+        for m in mid.split(",") {
+            for t in &tail {
+                if m.len() == 0 {
+                    return Err("Bad search path format");
+                }
+                output.push(format!("{}{}{}", head, m, t));
+            }
+        }
+
+        return Ok(output);
     }
 
     fn consider_file(&self, source: &str, file_rel_path: &str) -> bool {
@@ -201,11 +244,7 @@ impl FilePicker {
             let entry = entry.into_path();
 
             if added % 193 == 0 {
-                let s = format!(
-                    "\r[{}] Selecting files... {}",
-                    source_name,
-                    added
-                );
+                let s = format!("\r[{}] Selecting files... {}", source_name, added);
                 self.last_print_len = s.len();
                 print!("{}", s);
                 stdout().flush().unwrap();
@@ -366,7 +405,6 @@ impl FilePicker {
         println!("    total files:          {sum}");
         println!("");
 
-
         if self.diffs.len() > self.stats.patch_applied {
             println!("Warning: not all diffs were applied")
         }
@@ -379,8 +417,6 @@ impl FilePicker {
     }
 }
 
-
-
 macro_rules! load_envvar {
     ($varname:ident, $type:ident) => {
         let $varname: $type = match env::var_os(stringify!($varname)) {
@@ -390,15 +426,14 @@ macro_rules! load_envvar {
     };
 }
 
-fn main() {
-
+fn main() -> Result<(), &'static str> {
     // Read environment variables
     load_envvar!(bundle_dir, PathBuf);
     load_envvar!(build_dir, PathBuf);
     load_envvar!(bundle_texlive_name, String);
     load_envvar!(bundle_name, String);
 
-    let mut picker = FilePicker::new(&bundle_dir, &build_dir, &bundle_name);
+    let mut picker = FilePicker::new(&bundle_dir, &build_dir, &bundle_name)?;
 
     picker.add_extra();
 
@@ -412,4 +447,6 @@ fn main() {
     picker.add_meta_files();
     picker.generate_debug_files();
     picker.show_summary();
+
+    return Ok(());
 }
