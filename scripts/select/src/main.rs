@@ -23,13 +23,35 @@ struct PickStatistics {
     patch_applied: usize,
 }
 
+struct IndexEntry {
+    // Path relative to content
+    // (does not start with a slash)
+    path: PathBuf,
+
+    // Hash string or "nohash"
+    hash: Option<String>,
+}
+
+impl ToString for IndexEntry {
+    // Returns this indexentry as a line in the INDEX file.
+    fn to_string(&self) -> String {
+        return format!(
+            "/{} {}",
+            self.path.to_str().unwrap(),
+            match &self.hash {
+                Some(s) => &s,
+                None => "nohash",
+            }
+        );
+    }
+}
+
 struct FilePicker {
     include: PathBuf,
     output: PathBuf,
     content: PathBuf,
 
-    index: HashMap<String, Vec<PathBuf>>,
-    item_shas: HashMap<PathBuf, String>,
+    index: Vec<IndexEntry>,
     extra_basenames: HashSet<String>,
     diffs: HashMap<PathBuf, PathBuf>,
     ignore_patterns: Vec<Regex>,
@@ -44,10 +66,18 @@ struct FilePicker {
 // Insert a file into a FilePicker index, without a hash.
 // Used for generated files.
 macro_rules! add_to_index {
-    ($picker:expr, $name:literal) => {
-        $picker
-            .index
-            .insert($name.to_string(), vec![PathBuf::from($name)]);
+    ($picker:expr, $path:expr) => {
+        $picker.index.push(IndexEntry {
+            path: PathBuf::from($path),
+            hash: None,
+        })
+    };
+
+    ($picker:expr, $path:expr, $hash:expr) => {
+        $picker.index.push(IndexEntry {
+            path: PathBuf::from($path),
+            hash: Some($hash),
+        })
     };
 }
 
@@ -99,8 +129,7 @@ impl FilePicker {
             output: build_dir.join("output").join(&bundle_name),
 
             // Various arrays
-            index: HashMap::new(),
-            item_shas: HashMap::new(),
+            index: Vec::new(),
             extra_basenames: HashSet::new(),
             diffs: HashMap::new(),
 
@@ -190,23 +219,12 @@ impl FilePicker {
         file_rel_path: &str,
     ) -> Result<(), Box<dyn Error>> {
         let target_path = self.content.to_path_buf().join(source).join(file_rel_path);
-        let name = path
-            .file_name()
-            .ok_or("Couldn't get file name".to_string())?
-            .to_str()
-            .ok_or("Couldn't get file name as str".to_string())?;
 
-        // Add path to index
+        // Path to this file, relative to content dir
         let rel = target_path
             .strip_prefix(&self.content)
             .unwrap()
             .to_path_buf();
-        let v = self.index.get_mut(name);
-        if v.is_none() {
-            self.index.insert(name.to_owned(), vec![rel.clone()]);
-        } else {
-            v.unwrap().push(rel.clone());
-        }
 
         fs::create_dir_all(
             target_path
@@ -222,9 +240,8 @@ impl FilePicker {
         // Apply patch if one exists
         self.apply_patch(&target_path)?;
 
-        // Compute and save hash
-        let digest = try_digest(target_path)?;
-        self.item_shas.insert(rel, digest);
+        // Compute hash and add to index
+        add_to_index!(self, rel, try_digest(target_path)?);
 
         return Ok(());
     }
@@ -340,44 +357,27 @@ impl FilePicker {
         }
 
         // Add to index and hash search paths
-        self.index.insert("SEARCH".to_string(), vec![path.clone()]);
-        let digest = try_digest(&path)?;
-        self.item_shas.insert(path, digest);
+        add_to_index!(self, "SEARCH", try_digest(&path)?);
 
         return Ok(());
     }
 
     fn add_meta_files(&mut self) -> Result<(), Box<dyn Error>> {
-        let mut index_vec = Vec::from_iter(self.index.iter());
-        index_vec.sort_by(|a, b| a.0.cmp(b.0));
-
         // Add auxillary files to index.
         // These aren't hashed, but they need to be indexed.
         // Our hash is generated from the index, so we need to add these first.
         add_to_index!(self, "SHA256SUM");
         add_to_index!(self, "INDEX");
 
-        // Sort index so hashes are reproducible.
-        // Break ties with path.
         let mut index_vec = Vec::from_iter(self.index.iter());
-        index_vec.sort_by(|a, b| match a.0.cmp(b.0) {
-            std::cmp::Ordering::Equal => a.1.cmp(b.1),
-            _ => a.0.cmp(b.0),
-        });
+        index_vec.sort_by(|a, b| a.path.cmp(&b.path));
 
         let index_path = self.content.join("INDEX");
 
         // Save index.
         let mut file = File::create(&index_path)?;
-        for (_, paths) in index_vec {
-            let mut paths = paths.clone();
-            paths.sort();
-            for p in paths {
-                match self.item_shas.get(&p) {
-                    None => writeln!(file, "/{} nohash", p.to_str().unwrap())?,
-                    Some(d) => writeln!(file, "/{} {d}", p.to_str().unwrap())?,
-                };
-            }
+        for index_entry in index_vec {
+            writeln!(file, "{}", index_entry.to_string())?;
         }
 
         // Compute and save hash
@@ -435,13 +435,13 @@ impl FilePicker {
         println!(
             concat!(
                 "\n",
-                "============== Summary ==============\n",
+                "=============== Summary ===============\n",
                 "    extra file conflicts: {}\n",
                 "    files ignored:        {}\n",
                 "    files replaced:       {}\n",
                 "    diffs applied/found:  {}/{}\n",
-                "    =================================\n",
-                "    extra files added:    {}",
+                "    =============================\n",
+                "    extra files:          {}",
             ),
             self.stats.extra_conflict,
             self.stats.ignored,
@@ -451,9 +451,9 @@ impl FilePicker {
             self.stats.extra,
         );
 
-        let mut sum = 0usize;
+        let mut sum = self.stats.extra;
         for (source, count) in &self.stats.added {
-            let s = format!("{source}: ");
+            let s = format!("{source} files: ");
             println!("    {s}{}{count}", " ".repeat(22 - s.len()));
             sum += count;
         }
@@ -468,7 +468,7 @@ impl FilePicker {
             println!("Warning: some diffs were applied multiple times")
         }
 
-        println!("=====================================");
+        println!("=======================================");
     }
 }
 
