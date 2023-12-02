@@ -62,7 +62,6 @@
 /texlive/tex/luatex/.*
 /texlive/tex/lualatex/.*
 
-
 # Discontinued project
 # (Why is this even in texlive?)
 /texlive/tex/lambda/.*
