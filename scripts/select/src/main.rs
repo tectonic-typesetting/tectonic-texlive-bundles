@@ -5,7 +5,7 @@ use std::{
     fs::{self, File},
     io::{stdout, Write},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio}, os::unix::fs::PermissionsExt,
 };
 
 use regex::Regex;
@@ -30,7 +30,7 @@ struct FilePicker {
     index: HashMap<String, Vec<PathBuf>>,
     item_shas: HashMap<PathBuf, String>,
     extra_basenames: HashSet<String>,
-    diffs: HashMap<String, PathBuf>,
+    diffs: HashMap<PathBuf, PathBuf>,
     ignore_patterns: Vec<Regex>,
     search: Vec<String>,
 
@@ -136,18 +136,24 @@ impl FilePicker {
     }
 
     fn apply_patch(&mut self, path: &Path) -> Result<bool, Box<dyn Error>> {
-        let name = path
-            .file_name()
-            .ok_or("Couldn't get file name".to_string())?
-            .to_str()
-            .ok_or("Couldn't get file name as str".to_string())?;
+
+        // path is absolute, but self.diffs is indexed by
+        // paths relative to content dir.
+        let path_rel = path.strip_prefix(&self.content)?;
 
         // Is this file patched?
-        if !self.diffs.contains_key(name) {
+        if !self.diffs.contains_key(path_rel) {
             return Ok(false);
         }
 
-        let s = format!("Patching {name}");
+        // Debug print
+        let s = format!(
+            "Patching {}",
+            path.file_name()
+                .ok_or("Couldn't get file name".to_string())?
+                .to_str()
+                .ok_or("Couldn't get file name as str".to_string())?
+        );
         if s.len() < self.last_print_len {
             println!("\r{s}{}", " ".repeat(self.last_print_len - s.len()));
         } else {
@@ -156,12 +162,22 @@ impl FilePicker {
 
         self.stats.patch_applied += 1;
 
-        Command::new("patch")
+
+        // Discard first line of diff
+        let diff_file = fs::read_to_string(&self.diffs[path_rel]).unwrap();
+        let (_, diff) = diff_file.split_once('\n').unwrap();
+
+        let mut child = Command::new("patch")
             .arg("--quiet")
             .arg("--no-backup")
             .arg(path)
-            .arg(&self.diffs[name])
-            .output()?;
+            .stdin(Stdio::piped())
+            .spawn()?;
+
+        let mut stdin = child.stdin.take().unwrap();
+        stdin.write_all(diff.as_bytes())?;
+        drop(stdin);
+        child.wait()?;
 
         return Ok(true);
     }
@@ -196,7 +212,11 @@ impl FilePicker {
                 .parent()
                 .ok_or("Couldn't get parent".to_string())?,
         )?;
+
+        // Copy to content dir.
+        // Extracted dir is read-only, we need to chmod to patch.
         fs::copy(path, &target_path)?;
+        fs::set_permissions(&target_path, fs::Permissions::from_mode(0o664))?;
 
         // Apply patch if one exists
         self.apply_patch(&target_path)?;
@@ -224,12 +244,21 @@ impl FilePicker {
                 .ok_or("Couldn't get file name as str".to_string())?;
 
             if entry.extension().map(|x| x == "diff").unwrap_or(false) {
-                let n = &name[..name.len() - 5];
-                if self.diffs.contains_key(n) {
-                    println!("Warning: included diff {name} has conflicts, ignoring");
-                    continue;
+
+                // Read first line of diff to get target path
+                let diff_file = fs::read_to_string(&entry).unwrap();
+                let (target, _) = diff_file.split_once('\n').unwrap();
+
+                for t in Self::expand_search_line(target)?.into_iter().map(|x| PathBuf::from(x)) {
+
+                    if self.diffs.contains_key(&t) {
+                        println!("Warning: included diff {name} has target conflict, ignoring");
+                        continue;
+                    }
+    
+                    self.diffs.insert(t, entry.clone());
                 }
-                self.diffs.insert(n.to_owned(), entry);
+               
                 continue;
             }
 
