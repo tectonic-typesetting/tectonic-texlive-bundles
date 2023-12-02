@@ -386,13 +386,6 @@ impl FilePicker {
     }
 
     fn generate_debug_files(&self) -> Result<(), Box<dyn Error>> {
-        // This is essentially a detailed version of SHA256SUM,
-        // Good for finding file differences between bundles
-        let mut file = File::create(self.output.join("file-hashes"))?;
-        for (path, hash) in &self.item_shas {
-            writeln!(file, "{}\t{hash}", path.to_str().unwrap())?;
-        }
-
         let mut file = File::create(self.output.join("search-report"))?;
         for (_, paths) in &self.index {
             if !self.search_for_file(&paths) {
