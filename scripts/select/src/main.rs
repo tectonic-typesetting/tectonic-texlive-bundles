@@ -4,8 +4,9 @@ use std::{
     error::Error,
     fs::{self, File},
     io::{stdout, Write},
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
-    process::{Command, Stdio}, os::unix::fs::PermissionsExt,
+    process::{Command, Stdio},
 };
 
 use regex::Regex;
@@ -44,7 +45,9 @@ struct FilePicker {
 // Used for generated files.
 macro_rules! add_to_index {
     ($picker:expr, $name:literal) => {
-        $picker.index.insert($name.to_string(), vec![PathBuf::from($name)]);
+        $picker
+            .index
+            .insert($name.to_string(), vec![PathBuf::from($name)]);
     };
 }
 
@@ -136,7 +139,6 @@ impl FilePicker {
     }
 
     fn apply_patch(&mut self, path: &Path) -> Result<bool, Box<dyn Error>> {
-
         // path is absolute, but self.diffs is indexed by
         // paths relative to content dir.
         let path_rel = path.strip_prefix(&self.content)?;
@@ -161,7 +163,6 @@ impl FilePicker {
         }
 
         self.stats.patch_applied += 1;
-
 
         // Discard first line of diff
         let diff_file = fs::read_to_string(&self.diffs[path_rel]).unwrap();
@@ -244,21 +245,22 @@ impl FilePicker {
                 .ok_or("Couldn't get file name as str".to_string())?;
 
             if entry.extension().map(|x| x == "diff").unwrap_or(false) {
-
                 // Read first line of diff to get target path
                 let diff_file = fs::read_to_string(&entry).unwrap();
                 let (target, _) = diff_file.split_once('\n').unwrap();
 
-                for t in Self::expand_search_line(target)?.into_iter().map(|x| PathBuf::from(x)) {
-
+                for t in Self::expand_search_line(target)?
+                    .into_iter()
+                    .map(|x| PathBuf::from(x))
+                {
                     if self.diffs.contains_key(&t) {
                         println!("Warning: included diff {name} has target conflict, ignoring");
                         continue;
                     }
-    
+
                     self.diffs.insert(t, entry.clone());
                 }
-               
+
                 continue;
             }
 
