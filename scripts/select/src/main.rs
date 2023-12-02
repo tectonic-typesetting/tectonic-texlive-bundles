@@ -63,7 +63,7 @@ impl FilePicker {
             search: fs::read_to_string(&bundle_dir.join("search-order"))
                 .unwrap_or("".to_string())
                 .split("\n")
-                .map(|x| String::from(x.trim()))
+                .map(|x| x.trim())
                 .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
                 .map(|x| Self::expand_search_line(x))
                 .collect::<Result<Vec<Vec<String>>, &'static str>>()?
@@ -87,9 +87,9 @@ impl FilePicker {
     // Transform a search order file with shortcuts
     // (bash-like brace expansion, like `/a/b/{tex,latex}/c`)
     // into a plain list of strings.
-    fn expand_search_line(s: String) -> Result<Vec<String>, &'static str> {
+    fn expand_search_line(s: &str) -> Result<Vec<String>, &'static str> {
         if !(s.contains('{') || s.contains('}')) {
-            return Ok(vec![s]);
+            return Ok(vec![s.to_owned()]);
         }
 
         let first = s.find("{").ok_or("Bad search path format")?;
@@ -104,7 +104,7 @@ impl FilePicker {
         }
 
         // We find the first brace, so only tail may have other expansions.
-        let tail = Self::expand_search_line(s[last + 1..s.len()].to_owned())?;
+        let tail = Self::expand_search_line(&s[last + 1..s.len()])?;
 
         if mid.len() == 0 {
             return Err("Bad search path format");
