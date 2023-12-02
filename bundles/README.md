@@ -57,15 +57,17 @@ Each line is a proper [regex pattern](https://regexr.com/). Watch out for the fo
  - literal dots should be escaped (like `\.`)
 
 
-Matching is implemented using python's re.match(), which evaluates to true if the *whole path* matches
-this regular expression. All paths are relative to texmf-dist. For example, when deciding whether to include
-`/path/to/texmf-dist/tex/file.tex`, we will try to match `/tex/file.tex` against a line in the ignore file.
+Matching is implemented using a regular expression that matches the *whole path*.
+All paths are relative to this bundle's content dir. For example, when deciding whether to create
+`content/texlive/tex/file.tex`, we will try to match `/texlive/tex/file.tex` against a line in the ignore file.
+
+These paths include the "source" directory so that we may easily extend ignore patterns to other sources files.
 
 ### A few example patterns:
- - `/tex/.*`: Ignore everything under `texmf-dist/tex`
- - `.*\.log`: Ignore all paths ending in `.log`
+ - `/texlive/tex/.*`: Ignore everything under `texmf-dist/tex`
+ - `.*\.log`: Ignore all paths ending in `.log`, from any source.
  - `fonts`: Nothing will match this pattern. All paths begin with at least a `/`
- - `/fonts`: Only the file `/fonts` will match this pattern. Subfiles of a directory called `fonts` will *not* match, because the whole string must match. The correct way to ignore the `fonts` directory is with the pattern `/fonts/.*`.
+ - `/fonts`: Only the file `/fonts` will match this pattern. Subfiles of a directory called `fonts` will *not* match, because the whole string must match. The correct way to ignore the `fonts` directory (of texlive) is with the pattern `/texlive/fonts/.*`.
 
 
 
@@ -74,11 +76,27 @@ this regular expression. All paths are relative to texmf-dist. For example, when
 
 Any files in this directory will be added to the bundle. Subdirectories are traversed and ignored (we pretend the directory structure is flat). If a filename here conflicts with a file in TeXlive, the TeXlive version is **silently** ignored.
 
-Any file that ends with `.diff` is special. If the file selector encounters `a.diff`, it will NOT copy `a.diff` into the bundle. Instead, it will apply `a.diff` when it encounters a file named `a`.
+Any file that ends with `.diff` is special. If the file selector encounters `a.diff`, it will NOT copy `a.diff` into the bundle. Instead, it will apply `a.diff` to a file in the bundle.
 
-To make a diff file, run `diff <texlive-file> <modified-file>`. ORDER MATTERS! \
-Diffs are applied via a simple call to `patch <file> <diff>`. See [`select-files.py`](../scripts/select-files.py).
+To make a diff file, you must...
+ - Copy `<texlive-file>` to `<modified-file>` and apply your changes.
+ - Run `diff <texlive-file> <modified-file> > file.diff`. ORDER MATTERS!
+ - Add **one** new line to the top of `file.diff` containing a path to the file this diff should be applied to. This path should be relative to the bundle's content dir, as shown below.
+ - Place `file.diff` anywhere in your bundle's include dir. The file selection script should find and apply it.
 
+
+The following is an example diff for `texlive/tex/latex/fontawesome/fontawesome.sty`
+```diff
+texlive/tex/latex/fontawesome/fontawesome.sty
+45c45
+< \newfontfamily{\FA}{FontAwesome}
+---
+> \newfontfamily{\FA}{FontAwesome.otf}
+```
+The line at the top is **essential** and must be added manually. We can't do without it, since we may have many files with the same name.
+
+Also note that the brace decorations documented [below](#defining-search-paths) also apply to this first line.
+For example, `texlive/tex/{latex,latex-dev}/base/latex.ltx` will apply the diff to `latex.ltx` in both `texlive/tex/latex` and `texlive/tex/latex-dev`. This will only work if those files are identical.
 
 
 ## Finding files: `search-order`
@@ -106,7 +124,7 @@ Within tectonic's *bundles*[^1], we use INDEX and SEARCH files to map a filename
 This where things get interesting. First, we match all paths against each line of the bundles's `SEARCH` file with a simple `starts_with`.
   - If *exactly one* path matches a certain line, we immediately stop checking and use that path. Search lines are ordered by priority, so if only one path matches the first line, it *must* be the right path to use.
   - If multiple paths match a certain line, we discard all others and resolve the conflict alphabetically.
-  - If we've checked all lines of `SEARCH` and found no matches, we also resolve alphabetically.
+  - If we've checked all lines of `SEARCH` and found no matches, we didn't find the file. Return an error.
 
 "Resolving the conflict alphabetically" means we sort the paths in alphabetical order and pick the first. This emulates an alphabetically-ordered DFS on the file tree, which is a reasonable default.
 
@@ -115,8 +133,15 @@ Any filename conflicts which would be resolved alphabetically are listed in `sea
 
 ### Defining search paths
 
-Search paths are defined in `<bundle>/search-order`. This file is directly copied into `SEARCH` in the bundle.\
-It is a simple list of paths, relative to the bundle root directory, ordered by decreasing priority.
+Search paths are defined in `<bundle>/search-order`. This file is used to create `SEARCH` in the bundle.\
+It is a list of paths, relative to the bundle root directory, ordered by decreasing priority. Empty lines and lines starting with `#` are ignored.
+
+Lines may be decorated with braces: `/a/{b,c}/` will become `/a/b` and `a/c`, in that order.
+ - Brace decorations may not be nested.
+ - Paths may not contain braces. Escaping with `\{` will **not** work.
+ - **Spaces are not trimmed.** Do not put a space after each comma
+ - Multiple brace decorations in one line are allowed: `/{a,b}/{1,2}` expands to `/a/1`, `/a/2`, `/b/1`, `b/2`, in that order.
+
 
 Just like kpathsea search paths, each line can end with one or two slashes.
 

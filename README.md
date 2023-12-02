@@ -19,13 +19,10 @@ You only need these scripts if you want to make your own bundles of TeX files.
 
 To use these tools, you will need:
 
-- Bash
-- Python 3.11 & Python standard packages
+- Bash, `tar`, `zip`, `pv`, which you should already have installed
 - GNU `patch` and `diff`
-- An installation of [Docker](https://www.docker.com/).
 - A [TeXlive tarball](https://tug.org/texlive/acquire-tar.html). Different bundles need different TeXlive versions.
-- A Rust toolchain if you want to create “indexed tar” bundles. You don’t
-  need Rust if you want to create a bundle and test it locally.
+- A Rust toolchain (`cargo`).
 
 This repo also contains a `shell.nix` with pinned versions that contains all dependencies.
 
@@ -91,12 +88,14 @@ Once `./build/output/content` has been created, run any of the following command
 
 **`./build.sh <bundle> content` produces the following:**
  - `./build/output/<bundle>/content`: contains all bundle files. This directory also contains some metadata:
-   - `content/INDEX`: each line of this file maps a filename in the bundle to a full path. Duplicate filenames are included.
-   - `content/SHA256SUM`: a hash of this bundle's contents.
-   - `content/TEXLIVE-SHA265SUM`: a hash of the TeXlive image used to build this bundle.
+   - `content/INDEX`: each line of this file is `<path> <hash>`, sorted by file name.\
+   Files with identical names are included.\
+   Files not in any search path are also included.\
+   `<hash>` is either a hex sha256 of that file's contents, or `nohash` for a few special files.
+
+   - `content/SHA256SUM`: The sha256sum of `content/INDEX`. This string uniquely defines this bundle. \
+   This directory is organized by source. Files from the bundle's `include` dir will be under `./include`, texlive files will be under `./texlive`, and so on. Sources are defined `main.rs` of `scripts/select`.
  - `search-report`: debug file. Lists all filenames that will be resolved alphabetically.
- - `file-hashes`: debug file. Indexes the contents of the bundle. Used to find which files differ between two builds.
-  `file-hashes` and `content/SHA265SUM` are generated in roughly the same way, so the `file-hashes` files from two different bundles should match if and only if the two bundles have the same sha256sum
 
 
 **`./build.sh <bundle> zip` produces the following:**
