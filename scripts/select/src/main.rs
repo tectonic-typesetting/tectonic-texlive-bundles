@@ -43,8 +43,8 @@ struct FilePicker {
 // Insert a file into a FilePicker index, without a hash.
 // Used for generated files.
 macro_rules! add_to_index {
-    ($index:expr, $name:literal) => {
-        $index.insert($name.to_string(), vec![PathBuf::from($name)]);
+    ($picker:expr, $name:literal) => {
+        $picker.index.insert($name.to_string(), vec![PathBuf::from($name)]);
     };
 }
 
@@ -352,8 +352,8 @@ impl FilePicker {
         // Add auxillary files to index.
         // These aren't hashed, but they need to be indexed.
         // Our hash is generated from the index, so we need to add these first.
-        add_to_index!(self.index, "SHA256SUM");
-        add_to_index!(self.index, "INDEX");
+        add_to_index!(self, "SHA256SUM");
+        add_to_index!(self, "INDEX");
 
         // Sort index so hashes are reproducible.
         // Break ties with path.
@@ -372,8 +372,8 @@ impl FilePicker {
             paths.sort();
             for p in paths {
                 match self.item_shas.get(&p) {
-                    None => writeln!(file, "{}", p.to_str().unwrap())?,
-                    Some(d) => writeln!(file, "{} {d}", p.to_str().unwrap())?,
+                    None => writeln!(file, "/{} nohash", p.to_str().unwrap())?,
+                    Some(d) => writeln!(file, "/{} {d}", p.to_str().unwrap())?,
                 };
             }
         }
@@ -405,7 +405,7 @@ impl FilePicker {
     // and is used to test our search order.
     fn search_for_file(&self, paths: &Vec<PathBuf>) -> bool {
         let name = paths[0].file_name().unwrap().to_str().unwrap();
-        let paths: Vec<String> = paths.iter().map(|x| x.to_str().unwrap().into()).collect();
+        let paths: Vec<String> = paths.iter().map(|x| format!("/{}", x.to_str().unwrap())).collect();
 
         for rule in &self.search {
             for path in &paths {
@@ -417,6 +417,7 @@ impl FilePicker {
                     }
                 } else {
                     // Match full parent path
+                    println!("{rule} {}", &path[0..path.len() - name.len()]);
                     if &path[0..path.len() - name.len()] == rule {
                         return true;
                     }
