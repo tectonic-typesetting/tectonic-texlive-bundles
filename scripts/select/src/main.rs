@@ -40,6 +40,8 @@ struct FilePicker {
     last_print_len: usize,
 }
 
+// Insert a file into a FilePicker index, without a hash.
+// Used for generated files.
 macro_rules! add_to_index {
     ($index:expr, $name:literal) => {
         $index.insert($name.to_string(), vec![PathBuf::from($name)]);
@@ -47,7 +49,46 @@ macro_rules! add_to_index {
 }
 
 impl FilePicker {
-    fn new(bundle_dir: &Path, build_dir: &Path, bundle_name: &str) -> Result<Self, &'static str> {
+    // Transform a search order file with shortcuts
+    // (bash-like brace expansion, like `/a/b/{tex,latex}/c`)
+    // into a plain list of strings.
+    fn expand_search_line(s: &str) -> Result<Vec<String>, Box<dyn Error>> {
+        if !(s.contains('{') || s.contains('}')) {
+            return Ok(vec![s.to_owned()]);
+        }
+
+        let first = s.find("{").ok_or("Bad search path format")?;
+        let last = s.find("}").ok_or("Bad search path format")?;
+
+        let head = &s[..first];
+        let mid = &s[first + 1..last];
+
+        if mid.contains('{') || mid.contains('}') {
+            // Mismatched or nested braces
+            return Err("Bad search path format".into());
+        }
+
+        // We find the first brace, so only tail may have other expansions.
+        let tail = Self::expand_search_line(&s[last + 1..s.len()])?;
+
+        if mid.len() == 0 {
+            return Err("Bad search path format".into());
+        }
+
+        let mut output: Vec<String> = Vec::new();
+        for m in mid.split(",") {
+            for t in &tail {
+                if m.len() == 0 {
+                    return Err("Bad search path format".into());
+                }
+                output.push(format!("{}{}{}", head, m, t));
+            }
+        }
+
+        return Ok(output);
+    }
+
+    fn new(bundle_dir: &Path, build_dir: &Path, bundle_name: &str) -> Result<Self, Box<dyn Error>> {
         Ok(FilePicker {
             // Paths
             include: bundle_dir.join("include"),
@@ -66,7 +107,7 @@ impl FilePicker {
                 .map(|x| x.trim())
                 .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
                 .map(|x| Self::expand_search_line(x))
-                .collect::<Result<Vec<Vec<String>>, &'static str>>()?
+                .collect::<Result<Vec<Vec<String>>, Box<dyn Error>>>()?
                 .into_iter()
                 .flatten()
                 .collect(),
@@ -76,51 +117,12 @@ impl FilePicker {
                 .split("\n")
                 .map(|x| String::from(x.trim()))
                 .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
-                .map(|x| Regex::new(&format!("^{x}$")).unwrap())
-                .collect(),
+                .map(|x| Regex::new(&format!("^{x}$")))
+                .collect::<Result<Vec<Regex>, regex::Error>>()?,
 
             stats: PickStatistics::default(),
             last_print_len: 0,
         })
-    }
-
-    // Transform a search order file with shortcuts
-    // (bash-like brace expansion, like `/a/b/{tex,latex}/c`)
-    // into a plain list of strings.
-    fn expand_search_line(s: &str) -> Result<Vec<String>, &'static str> {
-        if !(s.contains('{') || s.contains('}')) {
-            return Ok(vec![s.to_owned()]);
-        }
-
-        let first = s.find("{").ok_or("Bad search path format")?;
-        let last = s.find("}").ok_or("Bad search path format")?;
-
-        let head = &s[..first];
-        let mid = &s[first + 1..last];
-
-        if mid.contains('{') || mid.contains('}') {
-            // Mismatched or nested braces
-            return Err("Bad search path format");
-        }
-
-        // We find the first brace, so only tail may have other expansions.
-        let tail = Self::expand_search_line(&s[last + 1..s.len()])?;
-
-        if mid.len() == 0 {
-            return Err("Bad search path format");
-        }
-
-        let mut output: Vec<String> = Vec::new();
-        for m in mid.split(",") {
-            for t in &tail {
-                if m.len() == 0 {
-                    return Err("Bad search path format");
-                }
-                output.push(format!("{}{}{}", head, m, t));
-            }
-        }
-
-        return Ok(output);
     }
 
     fn consider_file(&self, source: &str, file_rel_path: &str) -> bool {
@@ -133,16 +135,17 @@ impl FilePicker {
         return true;
     }
 
-    fn has_patch(&self, path: &Path) -> bool {
-        let name = path.file_name().unwrap().to_str().unwrap();
-        return self.diffs.contains_key(name);
-    }
+    fn apply_patch(&mut self, path: &Path) -> Result<bool, Box<dyn Error>> {
+        let name = path
+            .file_name()
+            .ok_or("Couldn't get file name".to_string())?
+            .to_str()
+            .ok_or("Couldn't get file name as str".to_string())?;
 
-    fn apply_patch(&mut self, path: &Path) -> bool {
-        if !self.has_patch(path) {
-            return false;
+        // Is this file patched?
+        if !self.diffs.contains_key(name) {
+            return Ok(false);
         }
-        let name = path.file_name().unwrap().to_str().unwrap();
 
         let s = format!("Patching {name}");
         if s.len() < self.last_print_len {
@@ -158,15 +161,23 @@ impl FilePicker {
             .arg("--no-backup")
             .arg(path)
             .arg(&self.diffs[name])
-            .output()
-            .expect("Patch failed");
+            .output()?;
 
-        return true;
+        return Ok(true);
     }
 
-    fn add_file(&mut self, path: &Path, source: &str, file_rel_path: &str) {
+    fn add_file(
+        &mut self,
+        path: &Path,
+        source: &str,
+        file_rel_path: &str,
+    ) -> Result<(), Box<dyn Error>> {
         let target_path = self.content.to_path_buf().join(source).join(file_rel_path);
-        let name = path.file_name().unwrap().to_str().unwrap();
+        let name = path
+            .file_name()
+            .ok_or("Couldn't get file name".to_string())?
+            .to_str()
+            .ok_or("Couldn't get file name as str".to_string())?;
 
         // Add path to index
         let rel = target_path
@@ -180,21 +191,27 @@ impl FilePicker {
             v.unwrap().push(rel.clone());
         }
 
-        fs::create_dir_all(target_path.parent().unwrap()).expect("FS error");
-        fs::copy(path, &target_path).expect("FS Error");
+        fs::create_dir_all(
+            target_path
+                .parent()
+                .ok_or("Couldn't get parent".to_string())?,
+        )?;
+        fs::copy(path, &target_path)?;
 
         // Apply patch if one exists
-        self.apply_patch(&target_path);
+        self.apply_patch(&target_path)?;
 
         // Compute and save hash
-        let digest = try_digest(target_path).unwrap();
+        let digest = try_digest(target_path)?;
         self.item_shas.insert(rel, digest);
+
+        return Ok(());
     }
 
-    fn add_extra(&mut self) {
+    fn add_extra(&mut self) -> Result<(), Box<dyn Error>> {
         // Only iterate files
         for entry in WalkDir::new(&self.include) {
-            let entry = entry.unwrap();
+            let entry = entry?;
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -202,9 +219,9 @@ impl FilePicker {
 
             let name = entry
                 .file_name()
-                .expect("Couldn't get file name")
+                .ok_or("Couldn't get file name".to_string())?
                 .to_str()
-                .unwrap();
+                .ok_or("Couldn't get file name as str".to_string())?;
 
             if entry.extension().map(|x| x == "diff").unwrap_or(false) {
                 let n = &name[..name.len() - 5];
@@ -226,18 +243,21 @@ impl FilePicker {
                 &entry,
                 "include",
                 entry.strip_prefix(&self.include).unwrap().to_str().unwrap(),
-            );
+            )?;
+
             self.stats.extra += 1;
             self.extra_basenames.insert(name.to_owned());
         }
+
+        return Ok(());
     }
 
-    fn add_tree(&mut self, source_name: &str, path: &Path) {
+    fn add_tree(&mut self, source_name: &str, path: &Path) -> Result<(), Box<dyn Error>> {
         let mut added = 0usize;
 
         // Only iterate files
         for entry in WalkDir::new(path) {
-            let entry = entry.unwrap();
+            let entry = entry?;
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -247,7 +267,7 @@ impl FilePicker {
                 let s = format!("\r[{}] Selecting files... {}", source_name, added);
                 self.last_print_len = s.len();
                 print!("{}", s);
-                stdout().flush().unwrap();
+                stdout().flush()?;
             }
 
             if !self.consider_file(
@@ -258,11 +278,7 @@ impl FilePicker {
                 continue;
             }
 
-            let name = entry
-                .file_name()
-                .expect("Couldn't get file name")
-                .to_str()
-                .unwrap();
+            let name = entry.file_name().unwrap().to_str().unwrap();
 
             if self.extra_basenames.contains(name) {
                 self.stats.replaced += 1;
@@ -273,30 +289,34 @@ impl FilePicker {
                 &entry,
                 source_name,
                 entry.strip_prefix(&path).unwrap().to_str().unwrap(),
-            );
+            )?;
             added += 1;
         }
 
         self.stats.added.insert(source_name.to_owned(), added);
         println!("\r[{source_name}] Selecting files... Done!       ");
         println!("");
+
+        return Ok(());
     }
 
-    fn add_search(&mut self) {
+    fn add_search(&mut self) -> Result<(), Box<dyn Error>> {
         let path = self.content.join("SEARCH");
 
-        let mut file = File::create(&path).unwrap();
+        let mut file = File::create(&path)?;
         for s in &self.search {
-            writeln!(file, "{s}").unwrap();
+            writeln!(file, "{s}")?;
         }
 
         // Add to index and hash search paths
         self.index.insert("SEARCH".to_string(), vec![path.clone()]);
-        let digest = try_digest(&path).unwrap();
+        let digest = try_digest(&path)?;
         self.item_shas.insert(path, digest);
+
+        return Ok(());
     }
 
-    fn add_meta_files(&mut self) {
+    fn add_meta_files(&mut self) -> Result<(), Box<dyn Error>> {
         let mut index_vec = Vec::from_iter(self.index.iter());
         index_vec.sort_by(|a, b| a.0.cmp(b.0));
 
@@ -317,42 +337,50 @@ impl FilePicker {
         let index_path = self.content.join("INDEX");
 
         // Save index.
-        let mut file = File::create(&index_path).unwrap();
+        let mut file = File::create(&index_path)?;
         for (name, paths) in index_vec {
             let mut paths = paths.clone();
             paths.sort();
             for p in paths {
                 match self.item_shas.get(&p) {
-                    None => writeln!(file, "{name} {}", p.to_str().unwrap()).unwrap(),
-                    Some(d) => writeln!(file, "{name} {} {d}", p.to_str().unwrap()).unwrap(),
+                    None => writeln!(file, "{name} {}", p.to_str().unwrap())?,
+                    Some(d) => writeln!(file, "{name} {} {d}", p.to_str().unwrap())?,
                 };
             }
         }
 
         // Compute and save hash
-        let mut file = File::create(self.content.join("SHA256SUM")).unwrap();
-        writeln!(file, "{}", try_digest(&index_path).unwrap()).unwrap();
+        let mut file = File::create(self.content.join("SHA256SUM"))?;
+        writeln!(file, "{}", try_digest(&index_path)?)?;
+
+        return Ok(());
     }
 
-    fn generate_debug_files(&self) {
+    fn generate_debug_files(&self) -> Result<(), Box<dyn Error>> {
         // This is essentially a detailed version of SHA256SUM,
         // Good for finding file differences between bundles
-        let mut file = File::create(self.output.join("file-hashes")).unwrap();
+        let mut file = File::create(self.output.join("file-hashes"))?;
         for (path, hash) in &self.item_shas {
-            writeln!(file, "{}\t{hash}", path.to_str().unwrap()).unwrap();
+            writeln!(file, "{}\t{hash}", path.to_str().unwrap())?;
         }
 
-        let mut file = File::create(self.output.join("search-report")).unwrap();
+        let mut file = File::create(self.output.join("search-report"))?;
         for (_, paths) in &self.index {
             if !self.search_for_file(&paths) {
                 for p in paths {
-                    writeln!(file, "{}", p.to_str().unwrap()).unwrap();
+                    writeln!(file, "{}", p.to_str().unwrap())?;
                 }
             }
         }
+
+        return Ok(());
     }
 
-    // Turn a name into a path
+    // Try to find a file given an array of paths from the index
+    // (all with the same file name)
+    //
+    // This is a simplified copy of the code in tectonic,
+    // and is used to test our search order.
     fn search_for_file(&self, paths: &Vec<PathBuf>) -> bool {
         let name = paths[0].file_name().unwrap().to_str().unwrap();
         let paths: Vec<String> = paths.iter().map(|x| x.to_str().unwrap().into()).collect();
@@ -420,13 +448,13 @@ impl FilePicker {
 macro_rules! load_envvar {
     ($varname:ident, $type:ident) => {
         let $varname: $type = match env::var_os(stringify!($varname)) {
-            Some(val) => $type::from(val.to_str().unwrap()),
-            None => panic!(concat!("Expected envvar ", stringify!($varname))),
-        };
+            Some(val) => Ok($type::from(val.to_str().unwrap())),
+            None => Err(concat!("Expected envvar ", stringify!($varname))),
+        }?;
     };
 }
 
-fn main() -> Result<(), &'static str> {
+fn main() -> Result<(), Box<dyn Error>> {
     // Read environment variables
     load_envvar!(bundle_dir, PathBuf);
     load_envvar!(build_dir, PathBuf);
@@ -435,17 +463,17 @@ fn main() -> Result<(), &'static str> {
 
     let mut picker = FilePicker::new(&bundle_dir, &build_dir, &bundle_name)?;
 
-    picker.add_extra();
+    picker.add_extra()?;
 
     picker.add_tree(
         "texlive",
         &build_dir.join("texlive").join(&bundle_texlive_name),
-    );
+    )?;
 
     println!("Preparing auxillary files...");
-    picker.add_search();
-    picker.add_meta_files();
-    picker.generate_debug_files();
+    picker.add_search()?;
+    picker.add_meta_files()?;
+    picker.generate_debug_files()?;
     picker.show_summary();
 
     return Ok(());
