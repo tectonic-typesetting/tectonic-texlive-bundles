@@ -11,8 +11,6 @@ in pkgs.mkShell {
 	buildInputs = with pkgs; [
 		cargo
 		cacert # Required to download crates
-		python3
-		docker
 		gnutar
 		zip
 		pv
