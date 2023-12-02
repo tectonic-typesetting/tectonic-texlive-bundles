@@ -388,45 +388,45 @@ impl FilePicker {
     }
 
     fn generate_debug_files(&self) -> Result<(), Box<dyn Error>> {
+        // Generate search-report
         let mut file = File::create(self.output.join("search-report"))?;
-        for (_, paths) in &self.index {
-            if !self.search_for_file(&paths) {
-                for p in paths {
-                    writeln!(file, "{}", p.to_str().unwrap())?;
+        for entry in WalkDir::new(&self.content) {
+            let entry = entry?;
+            if !entry.file_type().is_dir() {
+                continue;
+            }
+            let entry = entry
+                .into_path()
+                .strip_prefix(&self.content)
+                .unwrap()
+                .to_owned();
+            let entry = PathBuf::from("/").join(entry);
+
+            // Will this directory be searched?
+            let mut is_searched = false;
+            for rule in &self.search {
+                if rule.ends_with("//") {
+                    // Match start of patent path
+                    // (cutting off the last slash from)
+                    if entry.starts_with(&rule[0..rule.len() - 1]) {
+                        is_searched = true;
+                        break;
+                    }
+                } else {
+                    // Match full parent path
+                    if entry.to_str().unwrap() == rule {
+                        is_searched = true;
+                        break;
+                    }
                 }
+            }
+
+            if !is_searched {
+                writeln!(file, "{}", entry.to_str().unwrap())?;
             }
         }
 
         return Ok(());
-    }
-
-    // Try to find a file given an array of paths from the index
-    // (all with the same file name)
-    //
-    // This is a simplified copy of the code in tectonic,
-    // and is used to test our search order.
-    fn search_for_file(&self, paths: &Vec<PathBuf>) -> bool {
-        let name = paths[0].file_name().unwrap().to_str().unwrap();
-        let paths: Vec<String> = paths.iter().map(|x| format!("/{}", x.to_str().unwrap())).collect();
-
-        for rule in &self.search {
-            for path in &paths {
-                if rule.ends_with("//") {
-                    // Match start of patent path
-                    // (cutting off the last slash from)
-                    if path.starts_with(&rule[0..rule.len() - 1]) {
-                        return true;
-                    }
-                } else {
-                    // Match full parent path
-                    println!("{rule} {}", &path[0..path.len() - name.len()]);
-                    if &path[0..path.len() - name.len()] == rule {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 
     fn show_summary(&self) {

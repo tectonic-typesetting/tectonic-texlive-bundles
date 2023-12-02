@@ -95,7 +95,8 @@ Once `./build/output/content` has been created, run any of the following command
 
    - `content/SHA256SUM`: The sha256sum of `content/INDEX`. This string uniquely defines this bundle. \
    This directory is organized by source. Files from the bundle's `include` dir will be under `./include`, texlive files will be under `./texlive`, and so on. Sources are defined `main.rs` of `scripts/select`.
- - `search-report`: debug file. Lists all filenames that will be resolved alphabetically.
+ - `search-report`: debug file. Lists all directories that will not be searched by the rules in `search-order`.\
+  The entries in this file are non-recursive: If `search-report` contains a line with `/texlive`, this means that direct children of `/texlive` (like `/texlive/file.tex`) will not be found, but files in *subdirectories* (like `/texlive/tex/file.tex`) may be.
 
 
 **`./build.sh <bundle> zip` produces the following:**
