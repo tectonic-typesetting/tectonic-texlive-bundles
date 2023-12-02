@@ -10,7 +10,7 @@ use std::{
 };
 
 use regex::Regex;
-use sha256::try_digest;
+use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
 #[derive(Default)]
@@ -61,24 +61,6 @@ struct FilePicker {
 
     // Used to prettyprint.
     last_print_len: usize,
-}
-
-// Insert a file into a FilePicker index, without a hash.
-// Used for generated files.
-macro_rules! add_to_index {
-    ($picker:expr, $path:expr) => {
-        $picker.index.push(IndexEntry {
-            path: PathBuf::from($path),
-            hash: None,
-        })
-    };
-
-    ($picker:expr, $path:expr, $hash:expr) => {
-        $picker.index.push(IndexEntry {
-            path: PathBuf::from($path),
-            hash: Some($hash),
-        })
-    };
 }
 
 impl FilePicker {
@@ -212,6 +194,31 @@ impl FilePicker {
         return Ok(true);
     }
 
+    // Add a file into the filepicker index.
+    // path: path to file, relative to content
+    // file: path to file for hash, None if no hash is available.
+    fn add_to_index(&mut self, path: PathBuf, file: Option<&Path>) -> Result<(), Box<dyn Error>> {
+        self.index.push(IndexEntry {
+            path: path,
+            hash: match file {
+                None => None,
+                Some(f) => {
+                    let mut hasher = Sha256::new();
+                    let _ = std::io::copy(&mut fs::File::open(f)?, &mut hasher)?;
+                    Some(
+                        hasher
+                            .finalize()
+                            .iter()
+                            .map(|b| format!("{b:02x}"))
+                            .collect::<Vec<_>>()
+                            .concat(),
+                    )
+                }
+            },
+        });
+        return Ok(());
+    }
+
     fn add_file(
         &mut self,
         path: &Path,
@@ -240,8 +247,8 @@ impl FilePicker {
         // Apply patch if one exists
         self.apply_patch(&target_path)?;
 
-        // Compute hash and add to index
-        add_to_index!(self, rel, try_digest(target_path)?);
+        // Add to index
+        self.add_to_index(rel, Some(&target_path))?;
 
         return Ok(());
     }
@@ -357,7 +364,7 @@ impl FilePicker {
         }
 
         // Add to index and hash search paths
-        add_to_index!(self, "SEARCH", try_digest(&path)?);
+        self.add_to_index(PathBuf::from("SEARCH"), Some(&path))?;
 
         return Ok(());
     }
@@ -366,8 +373,8 @@ impl FilePicker {
         // Add auxillary files to index.
         // These aren't hashed, but they need to be indexed.
         // Our hash is generated from the index, so we need to add these first.
-        add_to_index!(self, "SHA256SUM");
-        add_to_index!(self, "INDEX");
+        self.add_to_index(PathBuf::from("SHA256SUM"), None)?;
+        self.add_to_index(PathBuf::from("INDEX"), None)?;
 
         let mut index_vec = Vec::from_iter(self.index.iter());
         index_vec.sort_by(|a, b| a.path.cmp(&b.path));
@@ -382,7 +389,17 @@ impl FilePicker {
 
         // Compute and save hash
         let mut file = File::create(self.content.join("SHA256SUM"))?;
-        writeln!(file, "{}", try_digest(&index_path)?)?;
+
+        let mut hasher = Sha256::new();
+        let _ = std::io::copy(&mut fs::File::open(&index_path)?, &mut hasher)?;
+        let hash = hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<Vec<_>>()
+            .concat();
+
+        writeln!(file, "{hash}")?;
 
         return Ok(());
     }
