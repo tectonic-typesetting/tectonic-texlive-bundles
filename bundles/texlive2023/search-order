@@ -1,2 +1,14 @@
-texlive/tex/{xelatex,latex,xetex,generic}//
-texlive/bibtex/{bib,bst,csf}//
+/
+/include//
+/texlive/tex/{xelatex,latex,xetex,generic}//
+/texlive/bibtex/{bib,bst,csf}//
+/texlive/web2c//
+/texlive/fonts//
+/texlive/biber//
+/texlive/mft//
+/texlive/dvips//
+/texlive/makeindex//
+/texlive/{web,cweb}//
+/texlive/tex4ht//
+/texlive/ttf2pk//
+/texlive/dvipdfmx/
