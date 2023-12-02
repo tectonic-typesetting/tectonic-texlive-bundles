@@ -422,7 +422,9 @@ impl FilePicker {
             }
 
             if !is_searched {
-                writeln!(file, "{}", entry.to_str().unwrap())?;
+                let s = entry.to_str().unwrap();
+                let t = s.matches("/").count();
+                writeln!(file, "{}{s}", "\t".repeat(t - 1))?;
             }
         }
 
