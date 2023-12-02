@@ -367,13 +367,13 @@ impl FilePicker {
 
         // Save index.
         let mut file = File::create(&index_path)?;
-        for (name, paths) in index_vec {
+        for (_, paths) in index_vec {
             let mut paths = paths.clone();
             paths.sort();
             for p in paths {
                 match self.item_shas.get(&p) {
-                    None => writeln!(file, "{name} {}", p.to_str().unwrap())?,
-                    Some(d) => writeln!(file, "{name} {} {d}", p.to_str().unwrap())?,
+                    None => writeln!(file, "{}", p.to_str().unwrap())?,
+                    Some(d) => writeln!(file, "{} {d}", p.to_str().unwrap())?,
                 };
             }
         }
