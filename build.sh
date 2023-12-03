@@ -285,6 +285,36 @@ function make_itar() {
 }
 
 
+# Make a V1 ttb from the content directory
+# Arguments:
+#	$1: bundle specification
+function make_ttb1() {
+	local bundle_dir="${1}"
+	load_bundle "${bundle_dir}"
+	local output_dir="${build_dir}/output/${bundle_name}"
+	local ttb_path="${output_dir}/${bundle_name}.ttb"
+	rm -f "${zip_path}"
+
+	if [ -z "$(ls -A "${output_dir}/content")" ]; then
+		echo "Bundle content directory doesn't exist at $(relative "${output_dir}/content")"
+		echo "Cannot proceed. Run \`./build.sh $(relative "${bundle_dir}") content\`, then try again."
+		exit 1
+	fi
+
+	if [[ -f "${ttb_path}" ]]; then
+		echo "ttb bundle exists at $(relative "${ttb_path}"), removing."
+		rm "${ttb_path}"
+	fi
+
+	(
+		cd "scripts/builder"
+		cargo build --quiet --release
+
+		cargo run --quiet --release -- \
+			v1 "${output_dir}/content" "${ttb_path}"
+	)
+}
+
 
 # We use the slightly unusual ordering `./build.sh <arg> <job>`
 # so that it's easier to change the job we're running on a bundle
@@ -322,6 +352,10 @@ case "${2}" in
 
 	"itar")
 		make_itar "${1}"
+	;;
+
+	"ttb1")
+		make_ttb1 "${1}"
 	;;
 
 	*)
