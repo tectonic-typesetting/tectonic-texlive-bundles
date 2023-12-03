@@ -117,7 +117,7 @@ impl FilePicker {
 
             search: fs::read_to_string(&bundle_dir.join("search-order"))
                 .unwrap_or("".to_string())
-                .split("\n")
+                .lines()
                 .map(|x| x.trim())
                 .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
                 .map(|x| Self::expand_search_line(x))
@@ -128,7 +128,7 @@ impl FilePicker {
 
             ignore_patterns: fs::read_to_string(bundle_dir.join("ignore"))
                 .unwrap_or("".to_string())
-                .split("\n")
+                .lines()
                 .map(|x| String::from(x.trim()))
                 .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
                 .map(|x| Regex::new(&format!("^{x}$")))
