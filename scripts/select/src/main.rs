@@ -374,7 +374,9 @@ impl FilePicker {
         // These aren't hashed, but they need to be indexed.
         // Our hash is generated from the index, so we need to add these first.
         self.add_to_index(PathBuf::from("SHA256SUM"), None)?;
-        self.add_to_index(PathBuf::from("INDEX"), None)?;
+
+        // We deliberately exclude INDEX from the index.
+        //self.add_to_index(PathBuf::from("INDEX"), None)?;
 
         let mut index_vec = Vec::from_iter(self.index.iter());
         index_vec.sort_by(|a, b| a.path.cmp(&b.path));
