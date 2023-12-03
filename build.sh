@@ -214,77 +214,6 @@ function select_files() {
 	echo ""
 }
 
-
-# Make a zip bundle from the content directory
-# Arguments:
-#	$1: bundle specification
-function make_zip() {
-	local bundle_dir="${1}"
-	load_bundle "${bundle_dir}"
-	local output_dir="${build_dir}/output/${bundle_name}"
-	local zip_path="${output_dir}/${bundle_name}.zip"
-	rm -f "${zip_path}"
-
-
-	if [ -z "$(ls -A "${output_dir}/content")" ]; then
-		echo "Bundle content directory doesn't exist at $(relative "${output_dir}/content")"
-		echo "Cannot proceed. Run \`./build.sh $(relative "${bundle_dir}") content\`, then try again."
-		exit 1
-	fi
-
-	if [[ -f "${zip_path}" ]]; then
-		echo "Zip bundle exists at $(relative "${zip_path}"), removing."
-		rm "${zip_path}"
-	fi
-
-	# Size is an estimate, since zip compresses files.
-	# Output will be smaller than input!
-	echo "Making zip bundle from content directory..."
-	local size=$(du -bs "${output_dir}/content" | awk '{print $1}')
-
-	(
-		# cd so paths are relative,
-		cd "${output_dir}/content"
-
-		zip -qr - "." | \
-			pv -berw 40 -s $size \
-			> "${zip_path}"
-	)
-
-	echo "Done."
-	echo ""
-}
-
-
-
-# Make an itar bundle from the content directory
-# Arguments:
-#	$1: bundle specification
-function make_itar() {
-	local bundle_dir="${1}"
-	load_bundle "${bundle_dir}"
-	local output_dir="${build_dir}/output/${bundle_name}"
-	local tar_path="${output_dir}/${bundle_name}.tar"
-
-	rm -f "${tar_path}"
-
-	# Subshell so cd is local
-	(
-		cd "scripts/zip2tarindex"
-
-		echo -n "Compiling zip2tarindex..."
-		cargo build --quiet --release
-		echo " Done!"
-
-		echo -n "Generating $(relative "${tar_path}")..."
-		cargo run --quiet --release -- \
-			"${output_dir}/content" "${tar_path}"
-		echo " Done!"
-	)
-	echo ""
-}
-
-
 # Make a V1 ttb from the content directory
 # Arguments:
 #	$1: bundle specification
@@ -321,21 +250,6 @@ function make_ttb1() {
 
 case "${2}" in
 
-	# Shortcuts
-	"most")
-		# Everything except installation
-		select_files "${1}"
-		make_zip "${1}"
-		make_itar "${1}"
-	;;
-
-	"package" | "packages")
-		# All packages
-		make_zip "${1}"
-		make_itar "${1}"
-	;;
-
-
 
 	# Single jobs
 	"extract")
@@ -344,14 +258,6 @@ case "${2}" in
 
 	"content")
 		select_files "${1}"
-	;;
-
-	"zip")
-		make_zip "${1}"
-	;;
-
-	"itar")
-		make_itar "${1}"
 	;;
 
 	"ttb1")
