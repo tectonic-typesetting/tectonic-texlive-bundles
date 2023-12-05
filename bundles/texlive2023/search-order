@@ -1,6 +1,6 @@
 /
 /include//
-/texlive/tex/{xelatex,latex,xetex,generic}//
+/texlive/tex/{xelatex,latex,xetex,plain,generic}//
 /texlive/bibtex/{bib,bst,csf}//
 /texlive/web2c//
 /texlive/fonts//

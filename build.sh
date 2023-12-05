@@ -217,7 +217,7 @@ function select_files() {
 # Make a V1 ttb from the content directory
 # Arguments:
 #	$1: bundle specification
-function make_ttb1() {
+function make_ttbv1() {
 	local bundle_dir="${1}"
 	load_bundle "${bundle_dir}"
 	local output_dir="${build_dir}/output/${bundle_name}"
@@ -260,8 +260,8 @@ case "${2}" in
 		select_files "${1}"
 	;;
 
-	"ttb1")
-		make_ttb1 "${1}"
+	"ttbv1" | "ttb1")
+		make_ttbv1 "${1}"
 	;;
 
 	*)
