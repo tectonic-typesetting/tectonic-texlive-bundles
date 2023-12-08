@@ -7,14 +7,15 @@ use std::{
     path::PathBuf,
 };
 
-const HEADER_SIZE: u64 = 70u64;
+// Size of ttbv1 header.
+const HEADER_SIZE: u64 = 66u64;
 
 #[derive(Debug)]
 struct IndexEntry {
     path: PathBuf,
     hash: String,
     start: u64,
-    length: u64,
+    length: u32,
 }
 
 impl ToString for IndexEntry {
@@ -35,7 +36,7 @@ pub struct BundleV1 {
     content_dir: PathBuf,
 
     index_start: u64,
-    index_len: u64,
+    index_len: u32,
 }
 
 impl BundleV1 {
@@ -87,11 +88,12 @@ impl BundleV1 {
                 let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
                 std::io::copy(&mut file, &mut encoder)?;
                 let len = self.target.write(&encoder.finish()?)?;
+                assert!(len < u32::MAX as usize);
 
                 // Add to index
                 self.index.push(IndexEntry {
                     start: byte_count,
-                    length: len as u64,
+                    length: len as u32,
                     path: PathBuf::from(path),
                     hash,
                 });
@@ -106,6 +108,13 @@ impl BundleV1 {
     }
 
     fn write_index(&mut self) -> Result<(), Box<dyn Error>> {
+        // Generate a ttbv1 index and write it to the bundle.
+        // This is NOT the same as the INDEX file (which is also included in this bundle)
+        //
+        // This index is a replacement for INDEX, containing everything in that file
+        // in addition to the start and length of each file.
+        // The original INDEX is still included in the bundle for consistency.
+
         // Get current position
         self.index_start = self.target.seek(std::io::SeekFrom::Current(0))?;
 
@@ -116,7 +125,9 @@ impl BundleV1 {
             encoder.write_all(s.as_bytes())?;
         }
 
-        self.index_len = self.target.write(&encoder.finish()?)? as u64;
+        let len = self.target.write(&encoder.finish()?)?;
+        assert!(len < u32::MAX as usize);
+        self.index_len = len as u32;
 
         return Ok(());
     }
@@ -142,7 +153,7 @@ impl BundleV1 {
         // 8 bytes: bundle version
         byte_count += self.target.write(&1u64.to_le_bytes())? as u64;
 
-        // 16 bytes: location of index
+        // 8 + 4 = 12 bytes: location of index
         byte_count += self.target.write(&self.index_start.to_le_bytes())? as u64;
         byte_count += self.target.write(&self.index_len.to_le_bytes())? as u64;
 
