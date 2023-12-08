@@ -1,15 +1,13 @@
+use crate::util::{decode_hex, WriteSeek};
+use flate2::{write::GzEncoder, Compression};
 use std::{
     error::Error,
     fs::{self, File},
-    io::{stdout, BufRead, BufReader, Seek, Write},
+    io::{stdout, BufRead, BufReader, Read, Seek, Write},
     path::PathBuf,
 };
 
-use crate::WriteSeek;
-use flate2::write::GzEncoder;
-use flate2::Compression;
-
-const HEADER_SIZE: u64 = 24u64;
+const HEADER_SIZE: u64 = 70u64;
 
 #[derive(Debug)]
 struct IndexEntry {
@@ -126,16 +124,33 @@ impl BundleV1 {
     fn write_header(&mut self) -> Result<u64, Box<dyn Error>> {
         self.target.seek(std::io::SeekFrom::Start(0))?;
 
+        // Parse bundle hash
+        let mut index_file = File::open(self.content_dir.join("SHA256SUM")).unwrap();
+        let mut text = String::new();
+        index_file.read_to_string(&mut text)?;
+        let digest = decode_hex(text.trim())?;
+
         let mut byte_count = 0u64;
+
+        // 14 bytes: signature
+        // Always "tectonicbundle", in any bundle version.
+        //
+        // This "magic sequence" lets us more easily distinguish between
+        // random binary files and proper tectonic bundles.
+        byte_count += self.target.write(b"tectonicbundle")? as u64;
 
         // 8 bytes: bundle version
         byte_count += self.target.write(&1u64.to_le_bytes())? as u64;
 
         // 16 bytes: location of index
-        // (currently zero, filled in later)
         byte_count += self.target.write(&self.index_start.to_le_bytes())? as u64;
         byte_count += self.target.write(&self.index_len.to_le_bytes())? as u64;
 
+        // 32 bytes: bundle hash
+        // We include this in the header so we don't need to load the index to get the hash.
+        byte_count += self.target.write(&digest)? as u64;
+
+        // Make sure we wrote the expected number of bytes
         assert!(byte_count == HEADER_SIZE);
 
         return Ok(byte_count);

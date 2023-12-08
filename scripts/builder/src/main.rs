@@ -1,17 +1,9 @@
+use crate::bundlev1::BundleV1;
 use core::panic;
-use std::{
-    env,
-    error::Error,
-    fs::File,
-    io::{Seek, Write},
-    path::PathBuf,
-};
+use std::{env, error::Error, fs::File, path::PathBuf};
 
 mod bundlev1;
-use crate::bundlev1::BundleV1;
-
-trait WriteSeek: std::io::Write + Seek {}
-impl<T: Write + Seek> WriteSeek for T {}
+mod util;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
