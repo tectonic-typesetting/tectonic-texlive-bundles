@@ -47,6 +47,8 @@ impl BundleV1 {
         bundle.write_index()?;
         bundle.write_header()?;
 
+        println!("Index is at {}, {}", bundle.index_start, bundle.index_len);
+
         return Ok(());
     }
 
@@ -111,15 +113,23 @@ impl BundleV1 {
         // Generate a ttbv1 index and write it to the bundle.
         // This is NOT the same as the INDEX file (which is also included in this bundle)
         //
-        // This index is a replacement for INDEX, containing everything in that file
-        // in addition to the start and length of each file.
-        // The original INDEX is still included in the bundle for consistency.
+        // This index is a replacement for INDEX and SEARCh, containing everything in those files
+        // (in addition to some ttbv1-specific information)
+        //
+        // The original INDEX and SEARCH files are still included in this bundle for consistency.
 
         // Get current position
         self.index_start = self.target.seek(std::io::SeekFrom::Current(0))?;
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
 
+        encoder.write_all("[SEARCH:MAIN]\n".as_bytes())?;
+        for l in fs::read_to_string(self.content_dir.join("SEARCH"))?.lines() {
+            encoder.write_all(l.as_bytes())?;
+            encoder.write_all(b"\n")?;
+        }
+
+        encoder.write_all("[INDEX]\n".as_bytes())?;
         for i in &self.index {
             let s = format!("{}\n", i.to_string());
             encoder.write_all(s.as_bytes())?;
@@ -136,10 +146,10 @@ impl BundleV1 {
         self.target.seek(std::io::SeekFrom::Start(0))?;
 
         // Parse bundle hash
-        let mut index_file = File::open(self.content_dir.join("SHA256SUM")).unwrap();
-        let mut text = String::new();
-        index_file.read_to_string(&mut text)?;
-        let digest = decode_hex(text.trim())?;
+        let mut hash_file = File::open(self.content_dir.join("SHA256SUM")).unwrap();
+        let mut hash_text = String::new();
+        hash_file.read_to_string(&mut hash_text)?;
+        let digest = decode_hex(hash_text.trim())?;
 
         let mut byte_count = 0u64;
 
