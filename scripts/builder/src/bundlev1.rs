@@ -11,14 +11,14 @@ use std::{
 const HEADER_SIZE: u64 = 66u64;
 
 #[derive(Debug)]
-struct IndexEntry {
+struct FileListEntry {
     path: PathBuf,
     hash: String,
     start: u64,
     length: u32,
 }
 
-impl ToString for IndexEntry {
+impl ToString for FileListEntry {
     fn to_string(&self) -> String {
         format!(
             "{} {} {} {}",
@@ -31,7 +31,7 @@ impl ToString for IndexEntry {
 }
 
 pub struct BundleV1 {
-    index: Vec<IndexEntry>,
+    filelist: Vec<FileListEntry>,
     target: Box<dyn WriteSeek>,
     content_dir: PathBuf,
 
@@ -54,7 +54,7 @@ impl BundleV1 {
 
     fn new(target: Box<dyn WriteSeek>, content_dir: PathBuf) -> Result<BundleV1, Box<dyn Error>> {
         return Ok(BundleV1 {
-            index: Vec::new(),
+            filelist: Vec::new(),
             target,
             content_dir: content_dir.to_owned(),
             index_start: 0,
@@ -67,8 +67,8 @@ impl BundleV1 {
         self.target
             .seek(std::io::SeekFrom::Start(byte_count.into()))?;
 
-        let index_file = File::open(self.content_dir.join("INDEX")).unwrap();
-        let reader = BufReader::new(index_file);
+        let filelist_file = File::open(self.content_dir.join("FILELIST")).unwrap();
+        let reader = BufReader::new(filelist_file);
 
         let mut count = 0usize;
 
@@ -93,7 +93,7 @@ impl BundleV1 {
                 assert!(len < u32::MAX as usize);
 
                 // Add to index
-                self.index.push(IndexEntry {
+                self.filelist.push(FileListEntry {
                     start: byte_count,
                     length: len as u32,
                     path: PathBuf::from(path),
@@ -101,7 +101,7 @@ impl BundleV1 {
                 });
                 byte_count += len as u64;
             } else {
-                panic!("malformed index line");
+                panic!("malformed filelist line");
             }
         }
 
@@ -111,12 +111,11 @@ impl BundleV1 {
 
     fn write_index(&mut self) -> Result<(), Box<dyn Error>> {
         // Generate a ttbv1 index and write it to the bundle.
-        // This is NOT the same as the INDEX file (which is also included in this bundle)
         //
-        // This index is a replacement for INDEX and SEARCh, containing everything in those files
+        // This index is a replacement for FILELIST and SEARCH, containing everything in those files
         // (in addition to some ttbv1-specific information)
         //
-        // The original INDEX and SEARCH files are still included in this bundle for consistency.
+        // The original FILELIST and SEARCH files are still included in the bundle.
 
         // Get current position
         self.index_start = self.target.seek(std::io::SeekFrom::Current(0))?;
@@ -129,8 +128,8 @@ impl BundleV1 {
             encoder.write_all(b"\n")?;
         }
 
-        encoder.write_all("[INDEX]\n".as_bytes())?;
-        for i in &self.index {
+        encoder.write_all("[FILELIST]\n".as_bytes())?;
+        for i in &self.filelist {
             let s = format!("{}\n", i.to_string());
             encoder.write_all(s.as_bytes())?;
         }

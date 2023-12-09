@@ -108,19 +108,19 @@ Any TeX distribution needs a way to find files. This is necessary because files 
 In a conventional TeXLive installation, kpathsea solves this problem. It defines an array of "search paths," and walks through them when you ask for a file. You can find an overview [here](https://www.overleaf.com/learn/latex/Articles/An_introduction_to_Kpathsea_and_how_TeX_engines_search_for_files) and more detailed information in the kpathsea docs.
 
 Tectonic's supporting files are distributed in bundles, so we can't use the same approach.
-Within tectonic's *bundles*[^1], we use INDEX and SEARCH files to map a filename to an input path. Note that this logic is implemented in tectonic, not in the bundle build script.
+Within tectonic's *bundles*[^1], we use FILELIST and SEARCH files to map a filename to an input path. Note that this logic is implemented in tectonic, not in the bundle build script.
 
 [^1]: Tectonic searches for files on your disk seperately. The information in this file only applies to bundles. I won't document this fully here, you'll have to read the tectonic docs and source code.
 
-- **Case 1:** tectonic looks for `file.tex` and finds one path in `INDEX`\
+- **Case 1:** tectonic looks for `file.tex` and finds one path in `FILELIST`\
   Nothing fancy here, we just use the file we found.
 
 - **Case 2:** tectonic looks for `partial/path/to/file.tex`\
   This is an edge case caused by some packages (for example, `fithesis`). To handle this,
-  we first find `file.tex` in `INDEX` and look at its path. If its path ends with `partial/path/to/file.tex`, we use it,
+  we first find `file.tex` in `FILELIST` and look at its path. If its path ends with `partial/path/to/file.tex`, we use it,
   if it doesn't, we don't. If multiple files match, we print an error--that shouldn't ever happen.
 
-- **Case 3:** tectonic looks for `file.tex` and finds multiple paths in `INDEX`\
+- **Case 3:** tectonic looks for `file.tex` and finds multiple paths in `FILELIST`\
 This where things get interesting. First, we match all paths against each line of the bundles's `SEARCH` file with a simple `starts_with`.
   - If *exactly one* path matches a certain line, we immediately stop checking and use that path. Search lines are ordered by priority, so if only one path matches the first line, it *must* be the right path to use.
   - If multiple paths match a certain line, we discard all others and resolve the conflict alphabetically.

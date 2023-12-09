@@ -66,12 +66,12 @@ Once `./build/output/content` has been created, run any of the following command
  - `./build/output/<bundle>/content`: contains all bundle files. It is organized by source: files from the bundle's `include` dir will be under `./include`, texlive files will be under `./texlive`, and so on. See `main.rs` of `scripts/select`.
  This directory also contains some metadata:
 
-   - `content/INDEX`: each line of this file is `<path> <hash>`, sorted by file name.\
+   - `content/FILES`: each line of this file is `<path> <hash>`, sorted by file name.\
    Files with identical names are included.\
    Files not in any search path are also included.\
    `<hash>` is either a hex sha256 of that file's contents, or `nohash` for a few special files.
 
-   - `content/SHA256SUM`: The sha256sum of `content/INDEX`. This string uniquely defines this bundle. \
+   - `content/SHA256SUM`: The sha256sum of `content/FILES`. This string uniquely defines this bundle. \
 
    - `content/SEARCH`: File search order for this bundle. See bundle spec documentation.
 

@@ -23,7 +23,7 @@ struct PickStatistics {
     patch_applied: usize,
 }
 
-struct IndexEntry {
+struct FileListEntry {
     // Path relative to content
     // (does not start with a slash)
     path: PathBuf,
@@ -32,8 +32,8 @@ struct IndexEntry {
     hash: Option<String>,
 }
 
-impl ToString for IndexEntry {
-    // Returns this indexentry as a line in the INDEX file.
+impl ToString for FileListEntry {
+    // Returns this FileListEntry as a line in FILELIST.
     fn to_string(&self) -> String {
         return format!(
             "/{} {}",
@@ -51,7 +51,7 @@ struct FilePicker {
     output: PathBuf,
     content: PathBuf,
 
-    index: Vec<IndexEntry>,
+    filelist: Vec<FileListEntry>,
     extra_basenames: HashSet<String>,
     diffs: HashMap<PathBuf, PathBuf>,
     ignore_patterns: Vec<Regex>,
@@ -111,7 +111,7 @@ impl FilePicker {
             output: build_dir.join("output").join(&bundle_name),
 
             // Various arrays
-            index: Vec::new(),
+            filelist: Vec::new(),
             extra_basenames: HashSet::new(),
             diffs: HashMap::new(),
 
@@ -194,11 +194,15 @@ impl FilePicker {
         return Ok(true);
     }
 
-    // Add a file into the filepicker index.
+    // Add a file into the file list.
     // path: path to file, relative to content
     // file: path to file for hash, None if no hash is available.
-    fn add_to_index(&mut self, path: PathBuf, file: Option<&Path>) -> Result<(), Box<dyn Error>> {
-        self.index.push(IndexEntry {
+    fn add_to_filelist(
+        &mut self,
+        path: PathBuf,
+        file: Option<&Path>,
+    ) -> Result<(), Box<dyn Error>> {
+        self.filelist.push(FileListEntry {
             path: path,
             hash: match file {
                 None => None,
@@ -247,8 +251,7 @@ impl FilePicker {
         // Apply patch if one exists
         self.apply_patch(&target_path)?;
 
-        // Add to index
-        self.add_to_index(rel, Some(&target_path))?;
+        self.add_to_filelist(rel, Some(&target_path))?;
 
         return Ok(());
     }
@@ -363,35 +366,34 @@ impl FilePicker {
             writeln!(file, "{s}")?;
         }
 
-        // Add to index and hash search paths
-        self.add_to_index(PathBuf::from("SEARCH"), Some(&path))?;
+        self.add_to_filelist(PathBuf::from("SEARCH"), Some(&path))?;
 
         return Ok(());
     }
 
     fn add_meta_files(&mut self) -> Result<(), Box<dyn Error>> {
-        // Add auxillary files to index.
-        // These aren't hashed, but they need to be indexed.
-        // Our hash is generated from the index, so we need to add these first.
-        self.add_to_index(PathBuf::from("SHA256SUM"), None)?;
-        self.add_to_index(PathBuf::from("INDEX"), None)?;
+        // Add auxillary files to the file list.
+        // These aren't hashed, but they must be listed anyway
+        // Our hash is generated from the filelist, so we need to add these before doing that.
+        self.add_to_filelist(PathBuf::from("SHA256SUM"), None)?;
+        self.add_to_filelist(PathBuf::from("FILELIST"), None)?;
 
-        let mut index_vec = Vec::from_iter(self.index.iter());
-        index_vec.sort_by(|a, b| a.path.cmp(&b.path));
+        let mut filelist_vec = Vec::from_iter(self.filelist.iter());
+        filelist_vec.sort_by(|a, b| a.path.cmp(&b.path));
 
-        let index_path = self.content.join("INDEX");
+        let filelist_path = self.content.join("FILELIST");
 
-        // Save index.
-        let mut file = File::create(&index_path)?;
-        for index_entry in index_vec {
-            writeln!(file, "{}", index_entry.to_string())?;
+        // Save FILELIST.
+        let mut file = File::create(&filelist_path)?;
+        for entry in filelist_vec {
+            writeln!(file, "{}", entry.to_string())?;
         }
 
         // Compute and save hash
         let mut file = File::create(self.content.join("SHA256SUM"))?;
 
         let mut hasher = Sha256::new();
-        let _ = std::io::copy(&mut fs::File::open(&index_path)?, &mut hasher)?;
+        let _ = std::io::copy(&mut fs::File::open(&filelist_path)?, &mut hasher)?;
         let hash = hasher
             .finalize()
             .iter()
