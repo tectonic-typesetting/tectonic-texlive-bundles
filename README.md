@@ -81,3 +81,5 @@ Once `./build/output/content` has been created, run any of the following command
 
 **`./build.sh <bundle> ttbv1` produces the following:**
  - `<bundle>.ttb`: the bundle. Note that the ttb version is *not* included in the extension.
+   - Index location and length are printed once this job completes.
+   - You can extract files from this bundle by running `dd if=file.ttb ibs=1 skip=<start> count=<len> | gunzip`
