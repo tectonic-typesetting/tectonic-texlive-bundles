@@ -15,8 +15,13 @@ struct FileListEntry {
     path: PathBuf,
     hash: String,
     start: u64,
-    gzip_len: u32,
+
+    // We need the compressed length to build
+    // a range request for this bundle. We also
+    // keep the real length around for performance
+    // (we'll only need to allocate vectors once)
     real_len: u32,
+    gzip_len: u32,
 }
 
 impl ToString for FileListEntry {
