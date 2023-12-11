@@ -1,4 +1,4 @@
-# Tectonic Bundle Builder
+# Tectonic Bundles
 
 This repository contains scripts for building bundles for
 [Tectonic](https://tectonic-typesetting.github.io), each of which is a complete TeX distribution.
@@ -53,10 +53,11 @@ To build a bundle, run the following jobs. These **must** be run in order!
  - `./build.sh <bundle> content`: assemble all files into a bundle at `./build/output/<bundle>content`.\
   This will delete all bundles in `output/<bundle>/`, move them elsewhere if you still need them.
 
-Once `./build/output/content` has been created, run any of the following commands to package the bundle:
+Once `./build/output/content` has been created, run any of the following commands to package the bundle.\
+See [`builder/README.md`](./scripts/builder/README.md) for details.
 
  - `./build.sh <bundle> ttbv1`: create a ttb (version 1) bundle from the content directory.\
-  TTB bundles may be used locally or hosted on the web.
+  TTB bundles may be used locally or hosted on the web. 
 
 
 ## Output Files
@@ -65,16 +66,12 @@ Once `./build/output/content` has been created, run any of the following command
 **`./build.sh <bundle> content` produces the following:**
  - `./build/output/<bundle>/content`: contains all bundle files. It is organized by source: files from the bundle's `include` dir will be under `./include`, texlive files will be under `./texlive`, and so on. See `main.rs` of `scripts/select`.
  This directory also contains some metadata:
-
    - `content/FILES`: each line of this file is `<path> <hash>`, sorted by file name.\
    Files with identical names are included.\
    Files not in any search path are also included.\
    `<hash>` is either a hex sha256 of that file's contents, or `nohash` for a few special files.
-
-   - `content/SHA256SUM`: The sha256sum of `content/FILES`. This string uniquely defines this bundle. \
-
+   - `content/SHA256SUM`: The sha256sum of `content/FILES`. This string uniquely defines this bundle.
    - `content/SEARCH`: File search order for this bundle. See bundle spec documentation.
-
  - `search-report`: debug file. Lists all directories that will not be searched by the rules in `search-order`.\
   The entries in this file are non-recursive: If `search-report` contains a line with `/texlive`, this means that direct children of `/texlive` (like `/texlive/file.tex`) will not be found, but files in *subdirectories* (like `/texlive/tex/file.tex`) may be.
 
