@@ -144,6 +144,9 @@ impl BundleV1 {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         let mut real_len = 0usize;
 
+        real_len += encoder.write("[DEFAULTSEARCH]\n".as_bytes())?;
+        real_len += encoder.write("MAIN\n".as_bytes())?;
+
         real_len += encoder.write("[SEARCH:MAIN]\n".as_bytes())?;
         for l in fs::read_to_string(self.content_dir.join("SEARCH"))?.lines() {
             real_len += encoder.write(l.as_bytes())?;
