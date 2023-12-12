@@ -16,6 +16,21 @@ import zipfile
 from test_utils import *
 
 
+"""
+
+Find textonic-format-<F> in bundle
+Make sure each format has a bundle file
+
+
+run 
+tectonic -p -b <zip> --outfmt fmt "<thisdir>/tectonic-format-<fmt>.tex"
+
+if result = 0, pass
+else fail
+
+
+"""
+
 def entrypoint(argv):
     settings = make_arg_parser().parse_args(argv[1:])
     bundle = Bundle.open_with_inferred_state(settings.bundle_dir)
@@ -38,7 +53,7 @@ def entrypoint(argv):
 
     # Compare to the test reference data
 
-    ref_formats = set()
+    ref_formats = set("latex", "plain")
 
     with open(bundle.path("formats.txt")) as fref:
         for line in fref:
