@@ -7,6 +7,36 @@
 Test builds using all of the LaTeX documentclasses provided in a bundle.
 """
 
+
+"""
+
+run 
+tectonic -p -b <zip> "file"
+
+on every .cls in the bundle.
+
+if result = 0, pass
+else fail
+
+
+Where file is 
+
+```
+\documentclass{class}
+
+% Optionally
+\title{Test Title}
+\author{An Author}
+
+\begin{document}
+Hello, world.
+\end{document}
+```
+
+"""
+
+
+
 import argparse
 import os.path
 import shutil
