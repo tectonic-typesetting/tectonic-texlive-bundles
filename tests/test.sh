@@ -25,6 +25,7 @@ function test_files() {
 
 	rm -drf "${output_dir}/files"
 	mkdir -p "${output_dir}/files"
+	mkdir -p "${output_dir}/files/logs"
 
 
 
@@ -33,10 +34,10 @@ function test_files() {
 
 		tectonic \
 			--chatter minimal \
-			--outdir "${output_dir}" \
+			--outdir "${output_dir}/files" \
 			--bundle "${bundle_path}" \
 			"${f}" \
-		&> "${output_dir}/files/$(basename "${f}").log"
+		&> "${output_dir}/files/logs/$(basename "${f}").log"
 		
 		if [[ $? == 0 ]]; then
 			echo -en "\r${GREEN}PASS${NC}"
@@ -52,11 +53,11 @@ function test_files() {
 
 		tectonic \
 			--chatter minimal \
-			--outdir "${output_dir}" \
+			--outdir "${output_dir}/files" \
 			-p --outfmt "fmt" \
 			--bundle "${bundle_path}" \
 			"${f}" \
-		&> "${output_dir}/files/$(basename "${f}").log"
+		&> "${output_dir}/files/logs/$(basename "${f}").log"
 		
 		if [[ $? == 0 ]]; then
 			echo -en "\r${GREEN}PASS${NC}"
