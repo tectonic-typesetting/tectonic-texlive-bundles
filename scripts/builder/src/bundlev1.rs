@@ -8,7 +8,7 @@ use std::{
 };
 
 // Size of ttbv1 header.
-const HEADER_SIZE: u64 = 70u64;
+const HEADER_SIZE: u64 = 66u64;
 
 #[derive(Debug)]
 struct FileListEntry {
@@ -185,8 +185,8 @@ impl BundleV1 {
         // random binary files and proper tectonic bundles.
         byte_count += self.target.write(b"tectonicbundle")? as u64;
 
-        // 8 bytes: bundle version
-        byte_count += self.target.write(&1u64.to_le_bytes())? as u64;
+        // 4 bytes: bundle version
+        byte_count += self.target.write(&1u32.to_le_bytes())? as u64;
 
         // 8 + 4 + 4 = 12 bytes: location and real length of index
         byte_count += self.target.write(&self.index_start.to_le_bytes())? as u64;

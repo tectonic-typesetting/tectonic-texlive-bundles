@@ -117,13 +117,14 @@ function test_class_single() {
 
 function test_classes() {
 	rm -drf "${output_dir}/classes"
+	mkdir -p "${output_dir}/classes"
 
 	local fails=0
 	local passes=0
 	local skipped=0
-	local total=$(wc -l < "${test_dir}/classes")
+	local total=$(wc -l < "${test_dir}/classes.list")
 
-	cat "${test_dir}/classes" | while read class flags; do
+	cat "${test_dir}/classes.list" | while read class flags; do
 
 		if [[ $flags =~ "xfail" ]]; then
 			skipped=$(($skipped+1))
@@ -161,7 +162,7 @@ function test_class() {
 	
 	exists=false;
 	exists=$(
-		cat "${test_dir}/classes" | while read tclass flags; do
+		cat "${test_dir}/classes.list" | while read tclass flags; do
 			if [[ "${class}" == "${tclass}" ]]; then
 				echo "${class}"
 				break

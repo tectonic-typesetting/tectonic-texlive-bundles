@@ -9,7 +9,7 @@ Note that the extension for a tectonic bundle is `ttb`, regardless of its versio
 
 A single TTBv1 bundle may be used on the network or from a local filesystem. This bundle format contains two parts:
 
- - A 70-byte header, documented below
+ - A 66-byte header, documented below
  - File data, a concatenated blob of gzipped files. One of these blobs is the bundle index.
 
 ### Header format
@@ -17,7 +17,7 @@ A TTBv1 header consists of the following fields, in order.
 All numbers are stored with little-endian byte ordering.
 
  - `14 bytes`: signature. Always `tectonicbundle`, in any ttb version.
- - ` 8 bytes`: bundle version, a `u64`. In this case, always 1.
+ - ` 4 bytes`: bundle version, a `u32`. In this case, always 1.
  - ` 8 bytes`: index location, a `u64`. This is the first byte of the bundle index file.
  - ` 4 bytes`: gzipped index length, a `u32`. This is the length the bundle index file.
  - ` 4 bytes`: true index length, a `u32`. This is the decompressed length the bundle index file.
