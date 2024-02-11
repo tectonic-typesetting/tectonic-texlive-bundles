@@ -1,3 +1,0 @@
-fonts/map/dvips/
-tex/latex-dev/
-tex4ht/

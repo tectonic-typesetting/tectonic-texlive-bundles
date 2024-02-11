@@ -1,3 +1,9 @@
 __pycache__/
-/state
-/zip2tarindex/target/
+/scripts/*/target/
+
+/build
+/tests/build
+
+*.ignore
+*.tar
+*.tar.xz

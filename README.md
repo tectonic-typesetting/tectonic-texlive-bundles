@@ -1,142 +1,115 @@
-# Tectonic TeXLive Bundle Builder
+# Tectonic Bundles
 
-This repository contains scripts for building “bundles” for
-[Tectonic](https://tectonic-typesetting.github.io) based on [Norbert Preining’s
-Git mirror](http://git.texlive.info/texlive/) of [the TeXLive Subversion
-repository](http://tug.org/svn/texlive/).
+This repository contains scripts for building bundles for
+[Tectonic](https://tectonic-typesetting.github.io), each of which is a complete TeX distribution.
 
-*You do not need this repository to build Tectonic.* You only need these scripts
-if you want to make your own bundle of TeX files based on the TeXLive sources.
+**You do not need this repository to build Tectonic.** \
+You only need these scripts if you want to make your own bundles of TeX files.
+
+**Warning:** The `./tests` do not work yet, they need to be reworked for the new bundle spec!
+
+
+
 
 
 ## Prerequisites
 
 To use these tools, you will need:
 
-- An installation of [Docker](https://www.docker.com/).
-- A checkout of the Preining TeXLive Git repository
-  (`git://git.texlive.info/texlive.git`), placed or symlinked in a subdirectory
-  named `state/repo` below this file. Be aware that this repository currently
-  weighs in at **40 gigabytes**!
-- A Rust toolchain if you want to create “indexed tar” bundles. (So, you don’t
-  need Rust if you want to create a bundle and test it locally.)
-
-Data files associated with the staging process will land in other subdirectories
-of `state/`.
+- Bash, `pv`, GNU `patch` and `diff`
+- A [TeXlive tarball](https://tug.org/texlive/acquire-tar.html). Different bundles need different TeXlive versions.
+- A Rust toolchain (`cargo`).
 
 
-## Getting started: creating the bundler image
-
-The first step is to create a Docker container that will host most of the
-computations — this promotes reproducibility and portability, regardless of what
-kind of system you are using. To create this container, run:
-
-```
-./driver.sh build-image
-```
 
 
-## Creating TeXLive containers
+## Bundles:
+Each directory in `./bundles` is a bundle specification, which contains everything we need to reproducibly build a bundle.\
+See [`./bundles/README.md`](./bundles/README.md) for details.
 
-The next step is to create TeXLive “containers” — which are different than
-Docker containers. A *Docker* container is an encapsulated Linux machine that
-provides a reproducible build environment. *TeXLive* containers are archives
-containing the files associated with the various TeXLive packages.
-
-To create TeXLive container files for all of the packages associated with your
-TeXLive checkout, run:
-
-```
-./driver.sh update-containers
-```
-
-This will use the Docker container to generate TeXLive container files in
-`state/containers`. *The results of this step will depend on what version of the
-TeXLive tree you currently have checked out in `state/repo`.*
+The following bundles are available:
+ - `texlive2023-nopatch`: based on `texlive2023-20230313`.
 
 
-## Creating a TeXLive installation tree
-
-Run:
-
-```
-./driver.sh make-installation bundles/tlextras
-./driver.sh install-packages bundles/tlextras
-```
-
-(In the future, we might add more specifications to the `bundles` directory for
-creating specialized bundles. The `tlextras` bundle is the one-size-fits-all
-default bundle.)
 
 
-## Updating patches
-
-As of TeXLive 2021, we have bitten the bullet and decided to maintain some
-patches against the TeXLive tree.
-
-Maintaining long-lived patches is never fun, but Git makes life a lot easier
-than it could be. We use a secondary branch named `vendor-pristine` to help
-maintain our patches. The way we do that is to copy the “vendor” (TeXLive
-original) files into branch, then use `git merge` to update the main branch with
-whatever changes have been introduced between TeXLive updates.
-
-First, bump the version of your bundle and run the standard update steps through
-the `install-packages` step described above. Make sure that the current branch
-is clean with no changes in the working tree or index. Then run:
-
-```
-./driver.sh get-vendor-pristine bundles/tlextras
-```
-
-Then follow the suggested workflow as printed out by that command. The basic
-plan is to commit the vendor files into the bundle’s `patched/` directory *on
-the vendor-pristine* branch, then merge them back into the main branch.
 
 
-## Exporting to a Zip-format bundle
+## Build Process:
+Before building any bundles, acquire a [TeXlive tarball](https://tug.org/texlive/acquire-tar.html) with a version that matches the bundle you want to build. These are usually distributed as compressed tarballs, which you'll have to manually decompress. **`build.sh` expects an uncompressed `.tar` file!** It checks the hash of this file, and will refuse to work if that hash doesn't match.
 
-Run:
-
-```
-./driver.sh make-zipfile bundles/tlextras
-```
-
-This will create a large Zip-format bundle file with a name something like
-`state/artifacts/tlextras-2020.0r0/tlextras-2020.0r0.zip`. Such a bundle file
-can be used with the `tectonic` command-line program with the `-b` argument.
+The tarball you end up with should have a name of the form `texlive-YYYYMMDD-texmf.tar`. **Do not rename this file!**
 
 
-## Converting to an “indexed tar” bundle
 
-This step is needed to create a bundle that will be hosted on the web. Run:
+To build a bundle, run the following jobs. These **must** be run in order!
 
-```
-./driver.sh make-itar bundles/tlextras
-```
+ - `./build.sh <tarball> extract`: extracts texlive into `./build/texlive/<version>`\
+  This also generates `TEXLIVE-SHA256SUM` in the texlive version directory.
 
-This will create both the `.tar` and the `.tar.index.gz` files that need to be
-uploaded for use as a web bundle.
+ - `./build.sh <bundle> content`: assemble all files into a bundle at `./build/output/<bundle>content`.\
+  This will delete all bundles in `output/<bundle>/`, move them elsewhere if you still need them.
+
+Once `./build/output/content` has been created, run any of the following commands to package the bundle.\
+See [`builder/README.md`](./scripts/builder/README.md) for details.
+
+ - `./build.sh <bundle> ttbv1`: create a ttb (version 1) bundle from the content directory.\
+  TTB bundles may be used locally or hosted on the web. 
+
+
+
+
+
+
+## Output Files
+
+
+**`./build.sh <bundle> content` produces the following:**
+ - `./build/output/<bundle>/content`: contains all bundle files. It is organized by source: files from the bundle's `include` dir will be under `./include`, texlive files will be under `./texlive`, and so on. See `main.rs` of `scripts/select`.
+ This directory also contains some metadata:
+   - `content/FILES`: each line of this file is `<path> <hash>`, sorted by file name.\
+   Files with identical names are included.\
+   Files not in any search path are also included.\
+   `<hash>` is either a hex sha256 of that file's contents, or `nohash` for a few special files.
+   - `content/SHA256SUM`: The sha256sum of `content/FILES`. This string uniquely defines this bundle.
+   - `content/SEARCH`: File search order for this bundle. See bundle spec documentation.
+ - `search-report`: debug file. Lists all directories that will not be searched by the rules in `search-order`.\
+  The entries in this file are non-recursive: If `search-report` contains a line with `/texlive`, this means that direct children of `/texlive` (like `/texlive/file.tex`) will not be found, but files in *subdirectories* (like `/texlive/tex/file.tex`) may be.
+
+
+**`./build.sh <bundle> ttbv1` produces the following:**
+ - `<bundle>.ttb`: the bundle. Note that the ttb version is *not* included in the extension.
+   - Index location and length are printed once this job completes.
+   - You can extract files from this bundle by running `dd if=file.ttb ibs=1 skip=<start> count=<len> | gunzip`
+
 
 
 ## Testing
 
-Bundle definitions come with testing information. To test a bundle, you need the
-`tectonic` command-line program to be in your $PATH, as well as a Python 3
-interpreter and the [toml] package.
+Tests are under `./tests`, and are currently a work in progress. All tests are run through `test.sh` as follows: `./test.sh <path-to-ttb> <test set>`.
 
-[toml]: https://pypi.org/project/toml/
+Tests require the following:
+ - a `ttb` bundle (local or remote)
+ - a recent installation of Tectonic
 
-Test scripts are located in the `tests` directory. Currently available:
+### Test Sets
+The following test sets are avaiable:
+ - `files`, which tries to compile all files under `tests/files` and `tests/formats`
+ - `classes`, which tries to compile a simple document using `tests/classes.list`
 
-- `tests/classes.py`: basic compilation smoketest of the documentclasses in a bundle
-- `tests/formats.py`: test generation of the format files defined in the bundle
-- `tests/packages.py`: test loading if the package (style) files defined in the
-  bundle. There are thousands of style files in a typical bundle, so this
-  program uses a framework to run a random-but-reproducible subset of the tests.
-  See the header comment in the Python file for more information.
+Note that most test files contain comments explaining the reason and expected outcome of the test.
 
 
-#### Copyright and Licensing
 
-The infrastructure scripts in this repository are licensed under the MIT
-License. Their copyright is assigned to the Tectonic Project.
+### Test Output
+All test output ends up under `tests/build`
+
+**Output for `files`:**
+ - `files/logs`: log files for all builds (passed or failed)
+ - `files/*.{pdf,fmt,etc}`: output files for each build
+
+
+**Output for `classes`
+ - `failed`: classes that failed to compile
+ - `passed`: classes that complied without error
+ - `logs`: log files for all compile jobs
