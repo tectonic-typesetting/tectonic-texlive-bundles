@@ -1,34 +1,109 @@
+use anyhow::{bail, Context, Result};
+use regex::Regex;
+use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::{
-    collections::{HashMap, HashSet},
-    error::Error,
+    collections::HashMap,
     fmt::Display,
     fs::{self, File},
-    io::{stdout, Write},
+    io::Write,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
-
-use regex::Regex;
-use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
+#[derive(Deserialize)]
+pub struct BundleConfig {
+    /// The bundle's name
+    pub name: String,
+
+    /// The name of the texlive tarball
+    pub texlive_name: String,
+
+    /// The hash of the texlive tarball this
+    /// bundle is built from
+    pub texlive_hash: String,
+
+    /// The hash of the resulting ttbv1 bundle
+    pub result_hash: String,
+
+    /// Search paths for this bundle
+    pub search_order: Vec<String>,
+
+    /// Files to ignore in this bundle
+    pub ignore: Vec<String>,
+}
+
 #[derive(Default)]
-struct PickStatistics {
-    extra: usize,
-    extra_conflict: usize,
+pub struct PickStatistics {
+    /// Total number of files added from each source
     added: HashMap<String, usize>,
+
+    /// Number of extra files added
+    extra: usize,
+
+    /// Number of extra file conflicts
+    extra_conflict: usize,
+
+    /// Total number of files ignored
     ignored: usize,
+
+    /// Total number of files replaced
     replaced: usize,
+
+    /// Total number of patches applied
     patch_applied: usize,
+
+    /// Total number of patches found
+    patch_found: usize,
+}
+
+impl PickStatistics {
+    pub fn make_string(&self) -> String {
+        let mut output_string = format!(
+            concat!(
+                "\n",
+                "=============== Summary ===============\n",
+                "    extra file conflicts: {}\n",
+                "    files ignored:        {}\n",
+                "    files replaced:       {}\n",
+                "    diffs applied/found:  {}/{}\n",
+                "    =============================\n",
+                "    extra files:          {}\n",
+            ),
+            self.extra_conflict,
+            self.ignored,
+            self.replaced,
+            self.patch_applied,
+            self.patch_found,
+            self.extra,
+        );
+
+        let mut sum = self.extra;
+        for (source, count) in &self.added {
+            let s = format!("{source} files: ");
+            output_string.push_str(&format!("    {s}{}{count}\n", " ".repeat(22 - s.len())));
+            sum += count;
+        }
+        output_string.push_str(&format!("    total files:          {sum}\n\n"));
+
+        //if self.diffs.len() > self.patch_applied {
+        //    println!("Warning: not all diffs were applied")
+        //}
+
+        //if self.diffs.len() < self.patch_applied {
+        //    println!("Warning: some diffs were applied multiple times")
+        //}
+
+        output_string.push_str(&format!("{}\n", "=".repeat(39)));
+        output_string
+    }
 }
 
 struct FileListEntry {
-    // Path relative to content
-    // (does not start with a slash)
+    /// Path relative to content dir (does not start with a slash)
     path: PathBuf,
-
-    // Hash string or "nohash"
     hash: Option<String>,
 }
 
@@ -47,54 +122,62 @@ impl Display for FileListEntry {
 }
 
 pub struct FilePicker {
-    include: PathBuf,
-    output: PathBuf,
-    content: PathBuf,
+    /// Where to place this bundle's files
+    build_dir: PathBuf,
 
-    filelist: Vec<FileListEntry>,
-    extra_basenames: HashSet<String>,
-    diffs: HashMap<PathBuf, PathBuf>,
+    /// A compiled list of filename patterns to ignore
     ignore_patterns: Vec<Regex>,
+
+    /// This file picker's statistics
+    pub stats: PickStatistics,
+
+    /// All files we've picked so far.
+    /// This map's keys are the `path` value of `FileListEntry`.
+    filelist: HashMap<PathBuf, FileListEntry>,
+
+    diffs: HashMap<PathBuf, PathBuf>,
     search: Vec<String>,
-
-    stats: PickStatistics,
-
-    // Used to prettyprint.
-    last_print_len: usize,
 }
 
 impl FilePicker {
-    // Transform a search order file with shortcuts
-    // (bash-like brace expansion, like `/a/b/{tex,latex}/c`)
-    // into a plain list of strings.
-    fn expand_search_line(s: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    /// Transform a search order file with shortcuts
+    /// (bash-like brace expansion, like `/a/b/{tex,latex}/c`)
+    /// into a plain list of strings.
+    fn expand_search_line(s: &str) -> Result<Vec<String>> {
         if !(s.contains('{') || s.contains('}')) {
             return Ok(vec![s.to_owned()]);
         }
 
-        let first = s.find('{').ok_or("Bad search path format")?;
-        let last = s.find('}').ok_or("Bad search path format")?;
+        let first = match s.find('{') {
+            Some(x) => x,
+            None => bail!("Bad search path format"),
+        };
+
+        let last = match s.find('}') {
+            Some(x) => x,
+            None => bail!("Bad search path format"),
+        };
 
         let head = &s[..first];
         let mid = &s[first + 1..last];
 
         if mid.contains('{') || mid.contains('}') {
             // Mismatched or nested braces
-            return Err("Bad search path format".into());
+            bail!("Bad search path format");
         }
 
         // We find the first brace, so only tail may have other expansions.
         let tail = Self::expand_search_line(&s[last + 1..s.len()])?;
 
         if mid.is_empty() {
-            return Err("Bad search path format".into());
+            bail!("Bad search path format");
         }
 
         let mut output: Vec<String> = Vec::new();
         for m in mid.split(',') {
             for t in &tail {
                 if m.is_empty() {
-                    return Err("Bad search path format".into());
+                    bail!("Bad search path format");
                 }
                 output.push(format!("{}{}{}", head, m, t));
             }
@@ -103,21 +186,26 @@ impl FilePicker {
         Ok(output)
     }
 
-    fn consider_file(&self, source: &str, file_rel_path: &str) -> bool {
+    /// Should we ignore the given file?
+    fn ignore_file(&self, source: &str, file_rel_path: &str) -> bool {
         let f = format!("/{source}/{file_rel_path}");
         for pattern in &self.ignore_patterns {
             if pattern.is_match(&f) {
-                return false;
+                return true;
             }
         }
 
-        true
+        false
     }
 
-    fn apply_patch(&mut self, path: &Path) -> Result<bool, Box<dyn Error>> {
+    /// Patch a file in-place.
+    /// This should be done after calling `add_file`.
+    fn apply_patch(&mut self, path: &Path) -> Result<bool> {
         // path is absolute, but self.diffs is indexed by
         // paths relative to content dir.
-        let path_rel = path.strip_prefix(&self.content)?;
+        let path_rel = path
+            .strip_prefix(&self.build_dir.join("content"))
+            .context("tried to patch file outside of build direcory")?;
 
         // Is this file patched?
         if !self.diffs.contains_key(path_rel) {
@@ -125,6 +213,7 @@ impl FilePicker {
         }
 
         // Debug print
+        /*
         let s = format!(
             "Patching {}",
             path.file_name()
@@ -132,11 +221,7 @@ impl FilePicker {
                 .to_str()
                 .ok_or("Couldn't get file name as str".to_string())?
         );
-        if s.len() < self.last_print_len {
-            println!("\r{s}{}", " ".repeat(self.last_print_len - s.len()));
-        } else {
-            println!("\r{s}");
-        }
+        */
 
         self.stats.patch_applied += 1;
 
@@ -159,55 +244,58 @@ impl FilePicker {
         Ok(true)
     }
 
-    // Add a file into the file list.
-    // path: path to file, relative to content
-    // file: path to file for hash, None if no hash is available.
-    fn add_to_filelist(
-        &mut self,
-        path: PathBuf,
-        file: Option<&Path>,
-    ) -> Result<(), Box<dyn Error>> {
-        self.filelist.push(FileListEntry {
-            path,
-            hash: match file {
-                None => None,
-                Some(f) => {
-                    let mut hasher = Sha256::new();
-                    let _ = std::io::copy(&mut fs::File::open(f)?, &mut hasher)?;
-                    Some(
-                        hasher
-                            .finalize()
-                            .iter()
-                            .map(|b| format!("{b:02x}"))
-                            .collect::<Vec<_>>()
-                            .concat(),
-                    )
-                }
+    /// Add a file into the file list.
+    fn add_to_filelist(&mut self, path: PathBuf, file: Option<&Path>) -> Result<()> {
+        self.filelist.insert(
+            path.clone(),
+            FileListEntry {
+                path,
+                hash: match file {
+                    None => None,
+                    Some(f) => {
+                        let mut hasher = Sha256::new();
+                        let _ = std::io::copy(&mut fs::File::open(f)?, &mut hasher)?;
+                        Some(
+                            hasher
+                                .finalize()
+                                .iter()
+                                .map(|b| format!("{b:02x}"))
+                                .collect::<Vec<_>>()
+                                .concat(),
+                        )
+                    }
+                },
             },
-        });
+        );
 
         Ok(())
     }
 
-    fn add_file(
-        &mut self,
-        path: &Path,
-        source: &str,
-        file_rel_path: &str,
-    ) -> Result<(), Box<dyn Error>> {
-        let target_path = self.content.to_path_buf().join(source).join(file_rel_path);
+    /// Add a file to this picker's content directory
+    fn add_file(&mut self, path: &Path, source: &str, file_rel_path: &str) -> Result<()> {
+        let target_path = self
+            .build_dir
+            .join("content")
+            .join(source)
+            .join(file_rel_path);
 
         // Path to this file, relative to content dir
         let rel = target_path
-            .strip_prefix(&self.content)
+            .strip_prefix(&self.build_dir.join("content"))
             .unwrap()
             .to_path_buf();
 
-        fs::create_dir_all(
-            target_path
-                .parent()
-                .ok_or("Couldn't get parent".to_string())?,
-        )?;
+        // Skip files that already exist
+        if self.filelist.contains_key(&rel) {
+            self.stats.extra_conflict += 1;
+            println!("Warning: file {path:?} has conflicts, ignoring");
+            return Ok(());
+        }
+
+        fs::create_dir_all(match target_path.parent() {
+            Some(x) => x,
+            None => bail!("couldn't get parent"),
+        })?;
 
         // Copy to content dir.
         // Extracted dir is read-only, we need to chmod to patch.
@@ -225,130 +313,108 @@ impl FilePicker {
 
 // Public methods
 impl FilePicker {
-    pub fn new(
-        bundle_dir: &Path,
-        build_dir: &Path,
-        bundle_name: &str,
-    ) -> Result<Self, Box<dyn Error>> {
-        Ok(FilePicker {
-            // Paths
-            include: bundle_dir.join("include"),
-            content: build_dir.join("output").join(bundle_name).join("content"),
-            output: build_dir.join("output").join(bundle_name),
+    /// Create a new file picker working in build_dir
+    pub fn new(bundle_config: &BundleConfig, build_dir: PathBuf) -> Result<Self> {
+        if !build_dir.is_dir() {
+            bail!("build_dir is not a directory!")
+        }
 
-            // Various arrays
-            filelist: Vec::new(),
-            extra_basenames: HashSet::new(),
+        if build_dir.read_dir()?.next().is_some() {
+            bail!("build_dir is not empty!")
+        }
+
+        Ok(FilePicker {
+            build_dir,
+
+            filelist: HashMap::new(),
             diffs: HashMap::new(),
 
-            search: fs::read_to_string(bundle_dir.join("search-order"))
-                .unwrap_or("".to_string())
-                .lines()
+            search: bundle_config
+                .search_order
+                .iter()
                 .map(|x| x.trim())
                 .filter(|x| !(x.is_empty() || x.starts_with('#')))
                 .map(Self::expand_search_line)
-                .collect::<Result<Vec<Vec<String>>, Box<dyn Error>>>()?
+                .collect::<Result<Vec<Vec<String>>>>()?
                 .into_iter()
                 .flatten()
                 .collect(),
 
-            ignore_patterns: fs::read_to_string(bundle_dir.join("ignore"))
-                .unwrap_or("".to_string())
-                .lines()
+            ignore_patterns: bundle_config
+                .ignore
+                .iter()
                 .map(|x| String::from(x.trim()))
                 .filter(|x| !(x.is_empty() || x.starts_with('#')))
                 .map(|x| Regex::new(&format!("^{x}$")))
                 .collect::<Result<Vec<Regex>, regex::Error>>()?,
 
             stats: PickStatistics::default(),
-            last_print_len: 0,
         })
     }
 
-    pub fn add_extra(&mut self) -> Result<(), Box<dyn Error>> {
-        // Only iterate files
-        for entry in WalkDir::new(&self.include) {
+    /// Load all `diff` files in a directory into this picker's patch list.
+    pub fn load_diffs_from(&mut self, path: &Path) -> Result<()> {
+        for entry in WalkDir::new(&path) {
+            // Only iterate files
             let entry = entry?;
             if !entry.file_type().is_file() {
                 continue;
             }
             let entry = entry.into_path();
 
-            let name = entry
-                .file_name()
-                .ok_or("Couldn't get file name".to_string())?
-                .to_str()
-                .ok_or("Couldn't get file name as str".to_string())?;
+            // Only include files with a `.diff extension`
+            if entry.extension().map(|x| x != "diff").unwrap_or(true) {
+                continue;
+            }
 
-            if entry.extension().map(|x| x == "diff").unwrap_or(false) {
-                // Read first line of diff to get target path
-                let diff_file = fs::read_to_string(&entry).unwrap();
-                let (target, _) = diff_file.split_once('\n').unwrap();
+            let name = match entry.file_name() {
+                Some(x) => match x.to_str() {
+                    Some(x) => x,
+                    None => bail!("Couldn't get file name as str"),
+                },
+                None => bail!("Couldn't get file name"),
+            };
 
-                for t in Self::expand_search_line(target)?
-                    .into_iter()
-                    .map(PathBuf::from)
-                {
-                    if self.diffs.contains_key(&t) {
-                        println!("Warning: included diff {name} has target conflict, ignoring");
-                        continue;
-                    }
+            // Read first line of diff to get target path
+            let diff_file = fs::read_to_string(&entry).unwrap();
+            let (target, _) = diff_file.split_once('\n').unwrap();
 
-                    self.diffs.insert(t, entry.clone());
+            for t in Self::expand_search_line(target)?
+                .into_iter()
+                .map(PathBuf::from)
+            {
+                if self.diffs.contains_key(&t) {
+                    println!("Warning: diff {name} has target conflict, ignoring");
+                    continue;
                 }
 
-                continue;
+                self.diffs.insert(t, entry.clone());
+                self.stats.patch_found += 1;
             }
-
-            if self.extra_basenames.contains(name) {
-                self.stats.extra_conflict += 1;
-                println!("Warning: included file {name} has conflicts, ignoring");
-                continue;
-            }
-
-            self.add_file(
-                &entry,
-                "include",
-                entry.strip_prefix(&self.include).unwrap().to_str().unwrap(),
-            )?;
-
-            self.stats.extra += 1;
-            self.extra_basenames.insert(name.to_owned());
         }
 
         Ok(())
     }
 
-    pub fn add_tree(&mut self, source_name: &str, path: &Path) -> Result<(), Box<dyn Error>> {
+    /// Add a directory of files to this bundle under `source_name`,
+    /// applying patches and checking for replacements.
+    pub fn add_tree(&mut self, source_name: &str, path: &Path) -> Result<()> {
         let mut added = 0usize;
 
-        // Only iterate files
         for entry in WalkDir::new(path) {
+            // Only iterate files
             let entry = entry?;
             if !entry.file_type().is_file() {
                 continue;
             }
             let entry = entry.into_path();
 
-            if added % 193 == 0 {
-                let s = format!("\r[{}] Selecting files... {}", source_name, added);
-                self.last_print_len = s.len();
-                print!("{}", s);
-                stdout().flush()?;
-            }
-
-            if !self.consider_file(
+            // Skip ignored files
+            if self.ignore_file(
                 source_name,
                 entry.strip_prefix(path).unwrap().to_str().unwrap(),
             ) {
                 self.stats.ignored += 1;
-                continue;
-            }
-
-            let name = entry.file_name().unwrap().to_str().unwrap();
-
-            if self.extra_basenames.contains(name) {
-                self.stats.replaced += 1;
                 continue;
             }
 
@@ -361,141 +427,99 @@ impl FilePicker {
         }
 
         self.stats.added.insert(source_name.to_owned(), added);
-        println!("\r[{source_name}] Selecting files... Done!       ");
-        println!();
 
         Ok(())
     }
 
-    pub fn add_search(&mut self) -> Result<(), Box<dyn Error>> {
-        let path = self.content.join("SEARCH");
+    pub fn finish(&mut self, save_debug_files: bool) -> Result<()> {
+        // Save search specification
+        {
+            let path = self.build_dir.join("content/SEARCH");
 
-        let mut file = File::create(&path)?;
-        for s in &self.search {
-            writeln!(file, "{s}")?;
-        }
-
-        self.add_to_filelist(PathBuf::from("SEARCH"), Some(&path))?;
-
-        Ok(())
-    }
-
-    pub fn add_meta_files(&mut self) -> Result<(), Box<dyn Error>> {
-        // Add auxillary files to the file list.
-        // These aren't hashed, but they must be listed anyway
-        // Our hash is generated from the filelist, so we need to add these before doing that.
-        self.add_to_filelist(PathBuf::from("SHA256SUM"), None)?;
-        self.add_to_filelist(PathBuf::from("FILELIST"), None)?;
-
-        let mut filelist_vec = Vec::from_iter(self.filelist.iter());
-        filelist_vec.sort_by(|a, b| a.path.cmp(&b.path));
-
-        let filelist_path = self.content.join("FILELIST");
-
-        // Save FILELIST.
-        let mut file = File::create(&filelist_path)?;
-        for entry in filelist_vec {
-            writeln!(file, "{entry}")?;
-        }
-
-        // Compute and save hash
-        let mut file = File::create(self.content.join("SHA256SUM"))?;
-
-        let mut hasher = Sha256::new();
-        let _ = std::io::copy(&mut fs::File::open(&filelist_path)?, &mut hasher)?;
-        let hash = hasher
-            .finalize()
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<Vec<_>>()
-            .concat();
-
-        writeln!(file, "{hash}")?;
-
-        Ok(())
-    }
-
-    pub fn generate_debug_files(&self) -> Result<(), Box<dyn Error>> {
-        // Generate search-report
-        let mut file = File::create(self.output.join("search-report"))?;
-        for entry in WalkDir::new(&self.content) {
-            let entry = entry?;
-            if !entry.file_type().is_dir() {
-                continue;
+            let mut file = File::create(&path)?;
+            for s in &self.search {
+                writeln!(file, "{s}")?;
             }
-            let entry = entry
-                .into_path()
-                .strip_prefix(&self.content)
-                .unwrap()
-                .to_owned();
-            let entry = PathBuf::from("/").join(entry);
 
-            // Will this directory be searched?
-            let mut is_searched = false;
-            for rule in &self.search {
-                if rule.ends_with("//") {
-                    // Match start of patent path
-                    // (cutting off the last slash from)
-                    if entry.starts_with(&rule[0..rule.len() - 1]) {
-                        is_searched = true;
-                        break;
+            self.add_to_filelist(PathBuf::from("SEARCH"), Some(&path))?;
+        }
+
+        // Add auxillary files to the file list.
+        {
+            // These aren't hashed, but must be listed anyway.
+            // The hash is generated from the filelist, so we must add these before hashing.
+            self.add_to_filelist(PathBuf::from("SHA256SUM"), None)?;
+            self.add_to_filelist(PathBuf::from("FILELIST"), None)?;
+
+            let mut filelist_vec = Vec::from_iter(self.filelist.values());
+            filelist_vec.sort_by(|a, b| a.path.cmp(&b.path));
+
+            let filelist_path = self.build_dir.join("content/FILELIST");
+
+            // Save FILELIST.
+            let mut file = File::create(&filelist_path)?;
+            for entry in filelist_vec {
+                writeln!(file, "{entry}")?;
+            }
+
+            // Compute and save hash
+            let mut file = File::create(self.build_dir.join("content/SHA256SUM"))?;
+
+            let mut hasher = Sha256::new();
+            let _ = std::io::copy(&mut fs::File::open(&filelist_path)?, &mut hasher)?;
+            let hash = hasher
+                .finalize()
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<Vec<_>>()
+                .concat();
+
+            writeln!(file, "{hash}")?;
+        }
+
+        if save_debug_files {
+            // Generate search-report
+            {
+                let mut file = File::create(self.build_dir.join("search-report"))?;
+                for entry in WalkDir::new(&self.build_dir.join("content")) {
+                    let entry = entry?;
+                    if !entry.file_type().is_dir() {
+                        continue;
                     }
-                } else {
-                    // Match full parent path
-                    if entry.to_str().unwrap() == rule {
-                        is_searched = true;
-                        break;
+                    let entry = entry
+                        .into_path()
+                        .strip_prefix(&self.build_dir.join("content"))
+                        .unwrap()
+                        .to_owned();
+                    let entry = PathBuf::from("/").join(entry);
+
+                    // Will this directory be searched?
+                    let mut is_searched = false;
+                    for rule in &self.search {
+                        if rule.ends_with("//") {
+                            // Match start of patent path
+                            // (cutting off the last slash from)
+                            if entry.starts_with(&rule[0..rule.len() - 1]) {
+                                is_searched = true;
+                                break;
+                            }
+                        } else {
+                            // Match full parent path
+                            if entry.to_str().unwrap() == rule {
+                                is_searched = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if !is_searched {
+                        let s = entry.to_str().unwrap();
+                        let t = s.matches('/').count();
+                        writeln!(file, "{}{s}", "\t".repeat(t - 1))?;
                     }
                 }
             }
-
-            if !is_searched {
-                let s = entry.to_str().unwrap();
-                let t = s.matches('/').count();
-                writeln!(file, "{}{s}", "\t".repeat(t - 1))?;
-            }
         }
-
         Ok(())
-    }
-
-    pub fn show_summary(&self) {
-        println!(
-            concat!(
-                "\n",
-                "=============== Summary ===============\n",
-                "    extra file conflicts: {}\n",
-                "    files ignored:        {}\n",
-                "    files replaced:       {}\n",
-                "    diffs applied/found:  {}/{}\n",
-                "    =============================\n",
-                "    extra files:          {}",
-            ),
-            self.stats.extra_conflict,
-            self.stats.ignored,
-            self.stats.replaced,
-            self.stats.patch_applied,
-            self.diffs.len(),
-            self.stats.extra,
-        );
-
-        let mut sum = self.stats.extra;
-        for (source, count) in &self.stats.added {
-            let s = format!("{source} files: ");
-            println!("    {s}{}{count}", " ".repeat(22 - s.len()));
-            sum += count;
-        }
-        println!("    total files:          {sum}");
-        println!();
-
-        if self.diffs.len() > self.stats.patch_applied {
-            println!("Warning: not all diffs were applied")
-        }
-
-        if self.diffs.len() < self.stats.patch_applied {
-            println!("Warning: some diffs were applied multiple times")
-        }
-
-        println!("=======================================");
     }
 }

@@ -120,90 +120,11 @@ function extract_texlive() {
 function select_files() {
 	# cargo run needs an absolute path
 	local bundle_dir="$(realpath "${1}")"
-	load_bundle "${bundle_dir}"
 
-	local texlive_dir="build/texlive/${bundle_texlive_name}"
-	local output_dir="${build_dir}/output/${bundle_name}"
-
-	if [[ ! -d "${texlive_dir}" ]]; then
-		echo "TeXLive source for \"${bundle_texlive_name}\" doesn't exist."
-		echo "You may have forgotten to run \`./bundle.sh extract\`"
-		exit 1
-	fi
-
-	local tar_hash="$(cat "${texlive_dir}/TEXLIVE-SHA256SUM")"
-
-	# Check texlive iso hash
-	if [[ "${bundle_texlive_hash}" == "" ]]; then
-		echo "Not checking TeXlive hash, bundle doesn't provide one."
-		echo "Continuing..."
-		sleep 1
-	else
-		echo "Checking extracted hash against $(relative "${bundle_dir}")..."
-		if [[ "${tar_hash}" == "${bundle_texlive_hash}" ]]; then
-			echo "OK: hash matches."
-		else
-			echo "Error: checksums do not match."
-			echo ""
-			echo "Got       $tar_hash"
-			echo "Expected  $bundle_texlive_hash"
-			echo ""
-			echo "This is a critical error. Edit the bundle specification"
-			echo "if you'd like to use a different file."
-			exit 1
-		fi
-		echo ""
-	fi
-
-	mkdir -p "${output_dir}"
-	if [ ! -z "$(ls -A "${output_dir}")" ]; then
-		echo "Output directory is $(relative "${output_dir}")"
-		for i in {5..2}; do
-			echo -en "[WARNING] Output directory isn't empty, deleting in $i seconds...\r"
-			sleep 1
-		done
-		echo -en "[WARNING] Output directory isn't empty, deleting in 1 second... \r"
-		sleep 1
-
-		echo -e "\nRunning \`rm -drf "${output_dir}"\`"
-		rm -drf "${output_dir}"
-		echo ""
-	fi
-	mkdir -p "${output_dir}"
-
-	(
-		cd "builder"
-		cargo build --quiet --release
-
-		cargo run --quiet --release -- \
-			select "${bundle_dir}" "${build_dir}" "${bundle_texlive_name}" "${bundle_name}"
-	)
-	if [[ $? != 0 ]]; then
-		echo "File selector failed"
-		exit 1
-	fi
-	echo ""
-
-	# Check content hash
-	local content_hash=$(cat "${output_dir}/content/SHA256SUM")
-
-	if [[ "${1}" != "nohash" ]]; then
-		if [[ "${bundle_texlive_hash}" == "" ]]; then
-			echo "Not checking content hash, bundle doesn't provide one."
-			echo "Continuing..."
-			sleep 2
-			exit 0
-		else
-			if [ "${content_hash}" != "${bundle_result_hash}" ]; then
-				echo "[WARNING] content hash does not match expected hash"
-				echo "got      \"${content_hash}\""
-				echo "expected \"${bundle_result_hash}\""
-			else
-				echo "File selection done, hash matches."
-			fi
-		fi
-	fi
-	echo ""
+	cd "builder"
+	cargo build --quiet --release
+	cargo run --quiet --release -- \
+		select "${bundle_dir}" "${build_dir}"
 }
 
 # Make a V1 ttb from the content directory
@@ -241,18 +162,15 @@ function make_ttbv1() {
 # so that it's easier to change the job we're running on a bundle
 
 case "${2}" in
-
-
-	# Single jobs
 	"extract")
 		extract_texlive "${1}"
 	;;
 
-	"content")
+	"select")
 		select_files "${1}"
 	;;
 
-	"ttbv1" | "ttb1")
+	"ttbv1")
 		make_ttbv1 "${1}"
 	;;
 
