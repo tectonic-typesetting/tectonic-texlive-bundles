@@ -172,19 +172,11 @@ function select_files() {
 	mkdir -p "${output_dir}"
 
 	(
-		cd "scripts/select"
+		cd "builder"
 		cargo build --quiet --release
 
-		# This requires a few envvars,
-		# see main.rs
-		export bundle_name
-		export bundle_texlive_hash
-		export bundle_texlive_name
-		export bundle_result_hash
-		#
-		export bundle_dir
-		export build_dir
-		cargo run --quiet --release
+		cargo run --quiet --release -- \
+			select "${bundle_dir}" "${build_dir}" "${bundle_texlive_name}" "${bundle_name}"
 	)
 	if [[ $? != 0 ]]; then
 		echo "File selector failed"
@@ -236,11 +228,11 @@ function make_ttbv1() {
 	fi
 
 	(
-		cd "scripts/builder"
+		cd "builder"
 		cargo build --quiet --release
 
 		cargo run --quiet --release -- \
-			v1 "${output_dir}/content" "${ttb_path}"
+			build v1 "${output_dir}/content" "${ttb_path}"
 	)
 }
 

@@ -6,3 +6,7 @@ edition = "2021"
 [dependencies]
 flate2 = { version = "^1.0.19", default-features = false, features = ["zlib"] }
 walkdir = "2"
+sha2 = "^0.10"
+regex = "1.10.2"
+clap = { version = "4.5.1", features = ["derive"] }
+anyhow = "1.0.80"

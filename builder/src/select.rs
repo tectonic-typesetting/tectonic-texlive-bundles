@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    env,
     error::Error,
     fs::{self, File},
     io::{stdout, Write},
@@ -46,7 +45,7 @@ impl ToString for FileListEntry {
     }
 }
 
-struct FilePicker {
+pub struct FilePicker {
     include: PathBuf,
     output: PathBuf,
     content: PathBuf,
@@ -101,42 +100,6 @@ impl FilePicker {
         }
 
         return Ok(output);
-    }
-
-    fn new(bundle_dir: &Path, build_dir: &Path, bundle_name: &str) -> Result<Self, Box<dyn Error>> {
-        Ok(FilePicker {
-            // Paths
-            include: bundle_dir.join("include"),
-            content: build_dir.join("output").join(&bundle_name).join("content"),
-            output: build_dir.join("output").join(&bundle_name),
-
-            // Various arrays
-            filelist: Vec::new(),
-            extra_basenames: HashSet::new(),
-            diffs: HashMap::new(),
-
-            search: fs::read_to_string(&bundle_dir.join("search-order"))
-                .unwrap_or("".to_string())
-                .lines()
-                .map(|x| x.trim())
-                .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
-                .map(|x| Self::expand_search_line(x))
-                .collect::<Result<Vec<Vec<String>>, Box<dyn Error>>>()?
-                .into_iter()
-                .flatten()
-                .collect(),
-
-            ignore_patterns: fs::read_to_string(bundle_dir.join("ignore"))
-                .unwrap_or("".to_string())
-                .lines()
-                .map(|x| String::from(x.trim()))
-                .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
-                .map(|x| Regex::new(&format!("^{x}$")))
-                .collect::<Result<Vec<Regex>, regex::Error>>()?,
-
-            stats: PickStatistics::default(),
-            last_print_len: 0,
-        })
     }
 
     fn consider_file(&self, source: &str, file_rel_path: &str) -> bool {
@@ -255,8 +218,51 @@ impl FilePicker {
 
         return Ok(());
     }
+}
 
-    fn add_extra(&mut self) -> Result<(), Box<dyn Error>> {
+// Public methods
+impl FilePicker {
+    pub fn new(
+        bundle_dir: &Path,
+        build_dir: &Path,
+        bundle_name: &str,
+    ) -> Result<Self, Box<dyn Error>> {
+        Ok(FilePicker {
+            // Paths
+            include: bundle_dir.join("include"),
+            content: build_dir.join("output").join(&bundle_name).join("content"),
+            output: build_dir.join("output").join(&bundle_name),
+
+            // Various arrays
+            filelist: Vec::new(),
+            extra_basenames: HashSet::new(),
+            diffs: HashMap::new(),
+
+            search: fs::read_to_string(&bundle_dir.join("search-order"))
+                .unwrap_or("".to_string())
+                .lines()
+                .map(|x| x.trim())
+                .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
+                .map(|x| Self::expand_search_line(x))
+                .collect::<Result<Vec<Vec<String>>, Box<dyn Error>>>()?
+                .into_iter()
+                .flatten()
+                .collect(),
+
+            ignore_patterns: fs::read_to_string(bundle_dir.join("ignore"))
+                .unwrap_or("".to_string())
+                .lines()
+                .map(|x| String::from(x.trim()))
+                .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
+                .map(|x| Regex::new(&format!("^{x}$")))
+                .collect::<Result<Vec<Regex>, regex::Error>>()?,
+
+            stats: PickStatistics::default(),
+            last_print_len: 0,
+        })
+    }
+
+    pub fn add_extra(&mut self) -> Result<(), Box<dyn Error>> {
         // Only iterate files
         for entry in WalkDir::new(&self.include) {
             let entry = entry?;
@@ -310,7 +316,7 @@ impl FilePicker {
         return Ok(());
     }
 
-    fn add_tree(&mut self, source_name: &str, path: &Path) -> Result<(), Box<dyn Error>> {
+    pub fn add_tree(&mut self, source_name: &str, path: &Path) -> Result<(), Box<dyn Error>> {
         let mut added = 0usize;
 
         // Only iterate files
@@ -358,7 +364,7 @@ impl FilePicker {
         return Ok(());
     }
 
-    fn add_search(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn add_search(&mut self) -> Result<(), Box<dyn Error>> {
         let path = self.content.join("SEARCH");
 
         let mut file = File::create(&path)?;
@@ -371,7 +377,7 @@ impl FilePicker {
         return Ok(());
     }
 
-    fn add_meta_files(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn add_meta_files(&mut self) -> Result<(), Box<dyn Error>> {
         // Add auxillary files to the file list.
         // These aren't hashed, but they must be listed anyway
         // Our hash is generated from the filelist, so we need to add these before doing that.
@@ -406,7 +412,7 @@ impl FilePicker {
         return Ok(());
     }
 
-    fn generate_debug_files(&self) -> Result<(), Box<dyn Error>> {
+    pub fn generate_debug_files(&self) -> Result<(), Box<dyn Error>> {
         // Generate search-report
         let mut file = File::create(self.output.join("search-report"))?;
         for entry in WalkDir::new(&self.content) {
@@ -450,7 +456,7 @@ impl FilePicker {
         return Ok(());
     }
 
-    fn show_summary(&self) {
+    pub fn show_summary(&self) {
         println!(
             concat!(
                 "\n",
@@ -489,38 +495,4 @@ impl FilePicker {
 
         println!("=======================================");
     }
-}
-
-macro_rules! load_envvar {
-    ($varname:ident, $type:ident) => {
-        let $varname: $type = match env::var_os(stringify!($varname)) {
-            Some(val) => Ok($type::from(val.to_str().unwrap())),
-            None => Err(concat!("Expected envvar ", stringify!($varname))),
-        }?;
-    };
-}
-
-fn main() -> Result<(), Box<dyn Error>> {
-    // Read environment variables
-    load_envvar!(bundle_dir, PathBuf);
-    load_envvar!(build_dir, PathBuf);
-    load_envvar!(bundle_texlive_name, String);
-    load_envvar!(bundle_name, String);
-
-    let mut picker = FilePicker::new(&bundle_dir, &build_dir, &bundle_name)?;
-
-    picker.add_extra()?;
-
-    picker.add_tree(
-        "texlive",
-        &build_dir.join("texlive").join(&bundle_texlive_name),
-    )?;
-
-    println!("Preparing auxillary files...");
-    picker.add_search()?;
-    picker.add_meta_files()?;
-    picker.generate_debug_files()?;
-    picker.show_summary();
-
-    return Ok(());
 }

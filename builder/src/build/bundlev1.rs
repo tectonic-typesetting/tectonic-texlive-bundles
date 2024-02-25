@@ -1,4 +1,5 @@
-use crate::util::{decode_hex, WriteSeek};
+use super::util::{decode_hex, WriteSeek};
+use anyhow::{bail, Result};
 use flate2::{write::GzEncoder, Compression};
 use std::{
     error::Error,
@@ -60,28 +61,28 @@ impl BundleV1 {
             bundle.index_start, bundle.index_gzip_len
         );
 
-        return Ok(());
+        Ok(())
     }
 
     fn new(target: Box<dyn WriteSeek>, content_dir: PathBuf) -> Result<BundleV1, Box<dyn Error>> {
-        return Ok(BundleV1 {
+        Ok(BundleV1 {
             filelist: Vec::new(),
             target,
             content_dir: content_dir.to_owned(),
             index_start: 0,
             index_gzip_len: 0,
             index_real_len: 0,
-        });
+        })
     }
 
-    fn add_files(&mut self) -> Result<u64, Box<dyn Error>> {
+    fn add_files(&mut self) -> Result<u64> {
         let mut byte_count = HEADER_SIZE; // Start after header
         let mut real_len_sum = 0; // Compute average compression ratio
 
         self.target
             .seek(std::io::SeekFrom::Start(byte_count.into()))?;
 
-        let filelist_file = File::open(self.content_dir.join("FILELIST")).unwrap();
+        let filelist_file = File::open(self.content_dir.join("FILELIST"))?;
         let reader = BufReader::new(filelist_file);
 
         let mut count = 0usize;
@@ -98,7 +99,7 @@ impl BundleV1 {
                 let path = path.to_owned();
                 let hash = hash.to_owned();
 
-                let mut file = fs::File::open(&self.content_dir.join(&path[1..])).unwrap();
+                let mut file = fs::File::open(&self.content_dir.join(&path[1..]))?;
 
                 // Compress and write bytes
                 let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -118,7 +119,7 @@ impl BundleV1 {
                 byte_count += gzip_len as u64;
                 real_len_sum += real_len;
             } else {
-                panic!("malformed filelist line");
+                bail!("malformed filelist line");
             }
         }
 
@@ -127,10 +128,11 @@ impl BundleV1 {
             "Average compression ratio: {:.2}",
             real_len_sum as f64 / byte_count as f64
         );
-        return Ok(byte_count);
+
+        Ok(byte_count)
     }
 
-    fn write_index(&mut self) -> Result<(), Box<dyn Error>> {
+    fn write_index(&mut self) -> Result<()> {
         // Generate a ttbv1 index and write it to the bundle.
         //
         // This index is a replacement for FILELIST and SEARCH, containing everything in those files
@@ -164,10 +166,10 @@ impl BundleV1 {
         self.index_gzip_len = gzip_len as u32;
         self.index_real_len = real_len as u32;
 
-        return Ok(());
+        Ok(())
     }
 
-    fn write_header(&mut self) -> Result<u64, Box<dyn Error>> {
+    fn write_header(&mut self) -> Result<u64> {
         self.target.seek(std::io::SeekFrom::Start(0))?;
 
         // Parse bundle hash
@@ -200,6 +202,6 @@ impl BundleV1 {
         // Make sure we wrote the expected number of bytes
         assert!(byte_count == HEADER_SIZE);
 
-        return Ok(byte_count);
+        Ok(byte_count)
     }
 }
