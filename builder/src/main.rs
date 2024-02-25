@@ -11,6 +11,7 @@ use std::{
 use tracing::{error, info, warn, Level};
 
 mod build;
+mod log;
 mod select;
 
 #[derive(Parser, Debug)]
@@ -52,6 +53,11 @@ enum BundleFormat {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
+
+    tracing_subscriber::fmt()
+        .with_max_level(Level::TRACE)
+        .event_format(LogFormatter::new(true))
+        .init();
 
     match cli.command {
         Commands::Select {
