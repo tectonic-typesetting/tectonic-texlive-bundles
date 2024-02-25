@@ -9,8 +9,6 @@ A bundle directory contains the following:
  - `bundle.sh`: bundle metadata, stored in bash variables
  - `ignore`: ignore patterns. TeXlive installation files matching any of these will not be included in the bundle.
  - `search-order`: These rules influence how tectonic resolves filename conflicts.
- - `tl-profile.txt`: the TeXlive profile to install. See TeXlive docs. \
- Note that all paths are replaced with `@dest@`, which is replaced with a path by the docker build script.
  - `include/`: extra files to include in the bundle. All files are read, including those in subdirectories. \
  This directory may also contain diffs, see below. Files ending in `.diff` are special.
 

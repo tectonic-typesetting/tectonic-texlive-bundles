@@ -2,10 +2,7 @@
 # This isn't a bash script, but that #! should give
 # us pretty highlighting in most editors.
 
-
 # Files and extensions we usually want to ignore.
-# if you're making a new bundle, it's a good idea to
-# copy this part.
 .*/00readme\.txt
 .*/LICENSE\.md
 .*/Makefile
@@ -19,25 +16,16 @@
 .*\.mf
 .*\.pl
 .*\.ps
-# End "always ignore" section.
 
-
-# Bundle-specific ignore patterns
-
-
-
-# I don't think tectonic has xindy support.
-# Ignore for now, causes many conflicts
+# I don't think tectonic has xindy support, ignore for now
 /texlive/xindy/.*
 
 # We may need this, but exclude for now.
-# Also causes many conflicts.
 /texlive/tex4ht/.*
 
 # These require pLaTeX2e, tectonic uses XeTeX
 /texlive/tex/uplatex/.*
 /texlive/tex/uptex/.*
-
 
 # Other odd tex formats & unnecessary files
 /texlive/tex/cslatex/.*
@@ -61,8 +49,5 @@
 /texlive/doc/.*
 /texlive/tex/luatex/.*
 /texlive/tex/lualatex/.*
-
-# Discontinued project
-# (Why is this even in texlive?)
 /texlive/tex/lambda/.*
 /texlive/omega/.*
