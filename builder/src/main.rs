@@ -25,6 +25,7 @@ struct Cli {
 enum Commands {
     /// Prepare files for a bundle
     Select {
+        /// Bundle specification directory
         bundle_dir: PathBuf,
 
         /// Build directory for this bundle
@@ -34,8 +35,12 @@ enum Commands {
     /// Build a bundle
     Build {
         format: BundleFormat,
-        content_dir: PathBuf,
-        target: String,
+
+        /// Bundle specification directory
+        bundle_dir: PathBuf,
+
+        /// Build directory for this bundle
+        build_dir: PathBuf,
     },
 }
 
@@ -106,11 +111,38 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         Commands::Build {
             format,
-            content_dir,
-            target,
-        } => match format {
-            BundleFormat::BundleV1 => BundleV1::make(Box::new(File::create(target)?), content_dir)?,
-        },
+            bundle_dir,
+            build_dir,
+        } => {
+            let mut file = File::open(bundle_dir.join("bundle.toml"))?;
+            let mut file_str = String::new();
+            file.read_to_string(&mut file_str)?;
+            let bundle_config: BundleConfig = toml::from_str(&file_str)?;
+
+            let build_dir = build_dir.join("output").join(&bundle_config.name);
+
+            if !build_dir.join("content").is_dir() {
+                error!("content directory `{build_dir:?}/content` doesn't exist, can't continue");
+                return Ok(());
+            }
+
+            let target = build_dir.join(format!("{}.ttb", &bundle_config.name));
+            if target.exists() {
+                if target.is_file() {
+                    warn!("target bundle `{target:?}` exists, removing");
+                    fs::remove_file(&target)?;
+                } else {
+                    error!("target bundle `{target:?}` exists and isn't a file, can't continue");
+                    return Ok(());
+                }
+            }
+
+            match format {
+                BundleFormat::BundleV1 => {
+                    BundleV1::make(Box::new(File::create(target)?), build_dir)?
+                }
+            }
+        }
     }
 
     Ok(())

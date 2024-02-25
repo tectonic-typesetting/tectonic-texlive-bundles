@@ -51,8 +51,8 @@ pub struct BundleV1 {
 }
 
 impl BundleV1 {
-    pub fn make(target: Box<dyn WriteSeek>, content_dir: PathBuf) -> Result<(), Box<dyn Error>> {
-        let mut bundle = BundleV1::new(target, content_dir)?;
+    pub fn make(target: Box<dyn WriteSeek>, build_dir: PathBuf) -> Result<(), Box<dyn Error>> {
+        let mut bundle = BundleV1::new(target, build_dir)?;
 
         bundle.add_files()?;
         bundle.write_index()?;
@@ -66,11 +66,11 @@ impl BundleV1 {
         Ok(())
     }
 
-    fn new(target: Box<dyn WriteSeek>, content_dir: PathBuf) -> Result<BundleV1, Box<dyn Error>> {
+    fn new(target: Box<dyn WriteSeek>, build_dir: PathBuf) -> Result<BundleV1, Box<dyn Error>> {
         Ok(BundleV1 {
             filelist: Vec::new(),
             target,
-            content_dir: content_dir.to_owned(),
+            content_dir: build_dir.join("content"),
             index_start: 0,
             index_gzip_len: 0,
             index_real_len: 0,

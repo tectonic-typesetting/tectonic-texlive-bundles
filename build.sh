@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-image_name="tectonic-bundler"
 this_dir="$(pwd)"
 build_dir="${this_dir}/build"
 
@@ -9,44 +8,6 @@ build_dir="${this_dir}/build"
 function relative() {
 	echo "./$(realpath --relative-to="${this_dir}" "${1}")"
 }
-
-
-# Load and check bundle metadata.
-function load_bundle() {
-	local bundle_dir="${1}"
-
-	if [ ! -d "$bundle_dir" ]; then
-		echo >&2 "[ERROR] $(relative "${bundle_dir}") doesn't exist, cannot proceed."
-		exit 1
-	fi
-	if [ ! -f "$bundle_dir/bundle.sh" ]; then
-		echo >&2 "[ERROR] $(relative "${bundle_dir}") has no bundle.sh, cannot proceed."
-		exit 1
-	fi
-	source "${bundle_dir}/bundle.sh"
-	if [[
-		-z ${bundle_name+x} ||
-		-z ${bundle_texlive_hash+x} ||
-		-z ${bundle_texlive_name+x} ||
-		-z ${bundle_result_hash+x}
-	]] ; then
-		echo >&2 "[ERROR] Bundle config is missing values, check bundle.sh"
-		exit 1
-	fi
-}
-
-
-
-
-
-# Job implementations are below
-# (In the order we need to run them)
-#
-# These functions take no implicit parameters.
-# All arguments are provided explicitly.
-
-
-
 
 # Extract the TeXLive tarball into /build/texlive.
 # Arguments:
@@ -115,8 +76,6 @@ function extract_texlive() {
 
 
 # Select files for this bundle
-# Arguments:
-#	$1: bundle specification
 function select_files() {
 	# cargo run needs an absolute path
 	local bundle_dir="$(realpath "${1}")"
@@ -128,32 +87,15 @@ function select_files() {
 }
 
 # Make a V1 ttb from the content directory
-# Arguments:
-#	$1: bundle specification
 function make_ttbv1() {
-	local bundle_dir="${1}"
-	load_bundle "${bundle_dir}"
-	local output_dir="${build_dir}/output/${bundle_name}"
-	local ttb_path="${output_dir}/${bundle_name}.ttb"
-	rm -f "${zip_path}"
-
-	if [ -z "$(ls -A "${output_dir}/content")" ]; then
-		echo "Bundle content directory doesn't exist at $(relative "${output_dir}/content")"
-		echo "Cannot proceed. Run \`./build.sh $(relative "${bundle_dir}") content\`, then try again."
-		exit 1
-	fi
-
-	if [[ -f "${ttb_path}" ]]; then
-		echo "ttb bundle exists at $(relative "${ttb_path}"), removing."
-		rm "${ttb_path}"
-	fi
+	local bundle_dir="$(realpath "${1}")"
 
 	(
 		cd "builder"
 		cargo build --quiet --release
 
 		cargo run --quiet --release -- \
-			build v1 "${output_dir}/content" "${ttb_path}"
+			build v1 "${bundle_dir}" "${build_dir}"
 	)
 }
 
