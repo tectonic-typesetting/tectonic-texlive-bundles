@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             picker.add_tree(
                 "texlive",
-                &build_dir.join("texlive").join(&bundle_texlive_name),
+                &build_dir.join("texlive").join(bundle_texlive_name),
             )?;
 
             println!("Preparing auxillary files...");
@@ -61,8 +61,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             picker.add_meta_files()?;
             picker.generate_debug_files()?;
             picker.show_summary();
-
-            return Ok(());
         }
         Commands::Build {
             format,
@@ -73,5 +71,5 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
     }
 
-    return Ok(());
+    Ok(())
 }

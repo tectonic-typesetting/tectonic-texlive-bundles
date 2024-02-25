@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
+    fmt::Display,
     fs::{self, File},
     io::{stdout, Write},
     os::unix::fs::PermissionsExt,
@@ -31,17 +32,17 @@ struct FileListEntry {
     hash: Option<String>,
 }
 
-impl ToString for FileListEntry {
-    // Returns this FileListEntry as a line in FILELIST.
-    fn to_string(&self) -> String {
-        return format!(
+impl Display for FileListEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        format!(
             "/{} {}",
             self.path.to_str().unwrap(),
             match &self.hash {
                 Some(s) => &s,
                 None => "nohash",
             }
-        );
+        )
+        .fmt(f)
     }
 }
 
@@ -71,8 +72,8 @@ impl FilePicker {
             return Ok(vec![s.to_owned()]);
         }
 
-        let first = s.find("{").ok_or("Bad search path format")?;
-        let last = s.find("}").ok_or("Bad search path format")?;
+        let first = s.find('{').ok_or("Bad search path format")?;
+        let last = s.find('}').ok_or("Bad search path format")?;
 
         let head = &s[..first];
         let mid = &s[first + 1..last];
@@ -85,21 +86,21 @@ impl FilePicker {
         // We find the first brace, so only tail may have other expansions.
         let tail = Self::expand_search_line(&s[last + 1..s.len()])?;
 
-        if mid.len() == 0 {
+        if mid.is_empty() {
             return Err("Bad search path format".into());
         }
 
         let mut output: Vec<String> = Vec::new();
-        for m in mid.split(",") {
+        for m in mid.split(',') {
             for t in &tail {
-                if m.len() == 0 {
+                if m.is_empty() {
                     return Err("Bad search path format".into());
                 }
                 output.push(format!("{}{}{}", head, m, t));
             }
         }
 
-        return Ok(output);
+        Ok(output)
     }
 
     fn consider_file(&self, source: &str, file_rel_path: &str) -> bool {
@@ -109,7 +110,8 @@ impl FilePicker {
                 return false;
             }
         }
-        return true;
+
+        true
     }
 
     fn apply_patch(&mut self, path: &Path) -> Result<bool, Box<dyn Error>> {
@@ -154,7 +156,7 @@ impl FilePicker {
         drop(stdin);
         child.wait()?;
 
-        return Ok(true);
+        Ok(true)
     }
 
     // Add a file into the file list.
@@ -166,7 +168,7 @@ impl FilePicker {
         file: Option<&Path>,
     ) -> Result<(), Box<dyn Error>> {
         self.filelist.push(FileListEntry {
-            path: path,
+            path,
             hash: match file {
                 None => None,
                 Some(f) => {
@@ -183,7 +185,8 @@ impl FilePicker {
                 }
             },
         });
-        return Ok(());
+
+        Ok(())
     }
 
     fn add_file(
@@ -216,7 +219,7 @@ impl FilePicker {
 
         self.add_to_filelist(rel, Some(&target_path))?;
 
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -230,20 +233,20 @@ impl FilePicker {
         Ok(FilePicker {
             // Paths
             include: bundle_dir.join("include"),
-            content: build_dir.join("output").join(&bundle_name).join("content"),
-            output: build_dir.join("output").join(&bundle_name),
+            content: build_dir.join("output").join(bundle_name).join("content"),
+            output: build_dir.join("output").join(bundle_name),
 
             // Various arrays
             filelist: Vec::new(),
             extra_basenames: HashSet::new(),
             diffs: HashMap::new(),
 
-            search: fs::read_to_string(&bundle_dir.join("search-order"))
+            search: fs::read_to_string(bundle_dir.join("search-order"))
                 .unwrap_or("".to_string())
                 .lines()
                 .map(|x| x.trim())
-                .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
-                .map(|x| Self::expand_search_line(x))
+                .filter(|x| !(x.is_empty() || x.starts_with('#')))
+                .map(Self::expand_search_line)
                 .collect::<Result<Vec<Vec<String>>, Box<dyn Error>>>()?
                 .into_iter()
                 .flatten()
@@ -253,7 +256,7 @@ impl FilePicker {
                 .unwrap_or("".to_string())
                 .lines()
                 .map(|x| String::from(x.trim()))
-                .filter(|x| (x.len() != 0) && (!x.starts_with('#')))
+                .filter(|x| !(x.is_empty() || x.starts_with('#')))
                 .map(|x| Regex::new(&format!("^{x}$")))
                 .collect::<Result<Vec<Regex>, regex::Error>>()?,
 
@@ -284,7 +287,7 @@ impl FilePicker {
 
                 for t in Self::expand_search_line(target)?
                     .into_iter()
-                    .map(|x| PathBuf::from(x))
+                    .map(PathBuf::from)
                 {
                     if self.diffs.contains_key(&t) {
                         println!("Warning: included diff {name} has target conflict, ignoring");
@@ -313,7 +316,7 @@ impl FilePicker {
             self.extra_basenames.insert(name.to_owned());
         }
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn add_tree(&mut self, source_name: &str, path: &Path) -> Result<(), Box<dyn Error>> {
@@ -336,7 +339,7 @@ impl FilePicker {
 
             if !self.consider_file(
                 source_name,
-                entry.strip_prefix(&path).unwrap().to_str().unwrap(),
+                entry.strip_prefix(path).unwrap().to_str().unwrap(),
             ) {
                 self.stats.ignored += 1;
                 continue;
@@ -352,16 +355,16 @@ impl FilePicker {
             self.add_file(
                 &entry,
                 source_name,
-                entry.strip_prefix(&path).unwrap().to_str().unwrap(),
+                entry.strip_prefix(path).unwrap().to_str().unwrap(),
             )?;
             added += 1;
         }
 
         self.stats.added.insert(source_name.to_owned(), added);
         println!("\r[{source_name}] Selecting files... Done!       ");
-        println!("");
+        println!();
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn add_search(&mut self) -> Result<(), Box<dyn Error>> {
@@ -374,7 +377,7 @@ impl FilePicker {
 
         self.add_to_filelist(PathBuf::from("SEARCH"), Some(&path))?;
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn add_meta_files(&mut self) -> Result<(), Box<dyn Error>> {
@@ -392,7 +395,7 @@ impl FilePicker {
         // Save FILELIST.
         let mut file = File::create(&filelist_path)?;
         for entry in filelist_vec {
-            writeln!(file, "{}", entry.to_string())?;
+            writeln!(file, "{entry}")?;
         }
 
         // Compute and save hash
@@ -409,7 +412,7 @@ impl FilePicker {
 
         writeln!(file, "{hash}")?;
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn generate_debug_files(&self) -> Result<(), Box<dyn Error>> {
@@ -448,12 +451,12 @@ impl FilePicker {
 
             if !is_searched {
                 let s = entry.to_str().unwrap();
-                let t = s.matches("/").count();
+                let t = s.matches('/').count();
                 writeln!(file, "{}{s}", "\t".repeat(t - 1))?;
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn show_summary(&self) {
@@ -483,7 +486,7 @@ impl FilePicker {
             sum += count;
         }
         println!("    total files:          {sum}");
-        println!("");
+        println!();
 
         if self.diffs.len() > self.stats.patch_applied {
             println!("Warning: not all diffs were applied")

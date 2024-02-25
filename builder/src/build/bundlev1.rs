@@ -3,6 +3,7 @@ use anyhow::{bail, Result};
 use flate2::{write::GzEncoder, Compression};
 use std::{
     error::Error,
+    fmt::Display,
     fs::{self, File},
     io::{stdout, BufRead, BufReader, Read, Seek, Write},
     path::PathBuf,
@@ -25,8 +26,8 @@ struct FileListEntry {
     gzip_len: u32,
 }
 
-impl ToString for FileListEntry {
-    fn to_string(&self) -> String {
+impl Display for FileListEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         format!(
             "{} {} {} {} {}",
             self.start,
@@ -35,6 +36,7 @@ impl ToString for FileListEntry {
             self.path.to_str().unwrap(),
             self.hash
         )
+        .fmt(f)
     }
 }
 
@@ -79,8 +81,7 @@ impl BundleV1 {
         let mut byte_count = HEADER_SIZE; // Start after header
         let mut real_len_sum = 0; // Compute average compression ratio
 
-        self.target
-            .seek(std::io::SeekFrom::Start(byte_count.into()))?;
+        self.target.seek(std::io::SeekFrom::Start(byte_count))?;
 
         let filelist_file = File::open(self.content_dir.join("FILELIST"))?;
         let reader = BufReader::new(filelist_file);
@@ -141,7 +142,7 @@ impl BundleV1 {
         // The original FILELIST and SEARCH files are still included in the bundle.
 
         // Get current position
-        self.index_start = self.target.seek(std::io::SeekFrom::Current(0))?;
+        self.index_start = self.target.stream_position()?;
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         let mut real_len = 0usize;
@@ -157,7 +158,7 @@ impl BundleV1 {
 
         real_len += encoder.write("[FILELIST]\n".as_bytes())?;
         for i in &self.filelist {
-            let s = format!("{}\n", i.to_string());
+            let s = format!("{i}\n");
             real_len += encoder.write(s.as_bytes())?;
         }
         let gzip_len = self.target.write(&encoder.finish()?)?;
