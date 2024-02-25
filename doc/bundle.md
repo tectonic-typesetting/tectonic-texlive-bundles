@@ -1,8 +1,5 @@
 # Bundle Specification
 
-Back to [`README.md`](../README.md)
-
-
 
 ## Contents
 A bundle directory contains the following:
@@ -11,7 +8,6 @@ A bundle directory contains the following:
  - `search-order`: These rules influence how tectonic resolves filename conflicts.
  - `include/`: extra files to include in the bundle. All files are read, including those in subdirectories. \
  This directory may also contain diffs, see below. Files ending in `.diff` are special.
-
 
 
 
@@ -43,7 +39,6 @@ bundle_result_hash="209d4b6a220bec2d1e2e89c7ba0dbe02b0e6f2416abce5fb8df228e06cf1
 
 
 
-
 ## Ignoring files: `ignore`
 Any path that matches a line in this file is ignored.
 Leading and trailing whitespace is ignored, empty lines are ignored.
@@ -61,6 +56,7 @@ All paths are relative to this bundle's content dir. For example, when deciding 
 
 These paths include the "source" directory so that we may easily extend ignore patterns to other sources files.
 
+
 ### A few example patterns:
  - `/texlive/tex/.*`: Ignore everything under `texmf-dist/tex`
  - `.*\.log`: Ignore all paths ending in `.log`, from any source.
@@ -69,9 +65,7 @@ These paths include the "source" directory so that we may easily extend ignore p
 
 
 
-
 ## Adding files: `include/`
-
 Any files in this directory will be added to the bundle. Subdirectories are traversed and ignored (we pretend the directory structure is flat). If a filename here conflicts with a file in TeXlive, the TeXlive version is **silently** ignored.
 
 Any file that ends with `.diff` is special. If the file selector encounters `a.diff`, it will NOT copy `a.diff` into the bundle. Instead, it will apply `a.diff` to a file in the bundle.
@@ -97,10 +91,11 @@ Also note that the brace decorations documented [below](#defining-search-paths) 
 For example, `texlive/tex/{latex,latex-dev}/base/latex.ltx` will apply the diff to `latex.ltx` in both `texlive/tex/latex` and `texlive/tex/latex-dev`. This will only work if those files are identical.
 
 
+
 ## Finding files: `search-order`
 
-### Overview
 
+### Overview
 Any TeX distribution needs a way to find files. This is necessary because files are usually included only by name: `\include{file}`, `\usepackage{package}`, etc. Where do we find `file.tex` and `package.sty`?
 
 In a conventional TeXLive installation, kpathsea solves this problem. It defines an array of "search paths," and walks through them when you ask for a file. You can find an overview [here](https://www.overleaf.com/learn/latex/Articles/An_introduction_to_Kpathsea_and_how_TeX_engines_search_for_files) and more detailed information in the kpathsea docs.
@@ -129,8 +124,8 @@ This where things get interesting. First, we match all paths against each line o
 Any filename conflicts which would be resolved alphabetically are listed in `search-report` after the `content` build step. These aren't errors, but we should look over that file to make sure everything is working as expected.
 
 
-### Defining search paths
 
+### Defining search paths
 Search paths are defined in `<bundle>/search-order`. This file is used to create `SEARCH` in the bundle.\
 It is a list of paths, relative to the bundle root directory, ordered by decreasing priority. Empty lines and lines starting with `#` are ignored.
 
