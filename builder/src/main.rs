@@ -1,4 +1,7 @@
-use crate::{build::bundlev1::BundleV1, select::BundleConfig};
+use crate::{
+    build::bundlev1::BundleV1,
+    select::{picker::FilePicker, spec::BundleSpec},
+};
 use anyhow::Context;
 use clap::{Parser, Subcommand, ValueEnum};
 use log::LogFormatter;
@@ -68,12 +71,28 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut file = File::open(bundle_dir.join("bundle.toml"))?;
             let mut file_str = String::new();
             file.read_to_string(&mut file_str)?;
-            let bundle_config: BundleConfig = toml::from_str(&file_str)?;
+            let bundle_config: BundleSpec = match toml::from_str(&file_str) {
+                Ok(x) => x,
+                Err(e) => {
+                    error!(
+                        tectonic_log_source = "select",
+                        "failed to load bundle specification: {}",
+                        e.message()
+                    );
+                    return Ok(());
+                }
+            };
 
-            let source_dir = PathBuf::from("../build/texlive/").join(&bundle_config.texlive_name);
+            if let Err(e) = bundle_config.validate() {
+                error!(
+                    tectonic_log_source = "select",
+                    "failed to validate bundle specification: {e}"
+                );
+                return Ok(());
+            };
 
             // Remove build dir if it exists
-            let build_dir = build_dir.join("output").join(&bundle_config.name);
+            let build_dir = build_dir.join("output").join(&bundle_config.bundle.name);
             if build_dir.exists() {
                 info!(
                     tectonic_log_source = "select",
@@ -83,29 +102,31 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             fs::create_dir_all(&build_dir).context("while creating build dir")?;
 
-            // Check input hash
-            {
-                let mut file = File::open(source_dir.join("TEXLIVE-SHA256SUM"))?;
-                let mut hash = String::new();
-                file.read_to_string(&mut hash)?;
-                let hash = hash.trim();
-                if hash != bundle_config.texlive_hash {
-                    error!(
-                        tectonic_log_source = "select",
-                        "texlive hash doesn't match, refusing to continue"
-                    );
-                    return Ok(());
-                }
-            }
+            /*
+                        let source_dir = PathBuf::from("../build/texlive/").join(&bundle_config.texlive_name);
 
-            let mut picker = select::FilePicker::new(&bundle_config, build_dir.clone())?;
 
-            if bundle_dir.join("patches").exists() {
-                picker.load_diffs_from(&bundle_dir.join("patches"))?;
-            }
+                        // Check input hash
+                        {
+                            let mut file = File::open(source_dir.join("TEXLIVE-SHA256SUM"))?;
+                            let mut hash = String::new();
+                            file.read_to_string(&mut hash)?;
+                            let hash = hash.trim();
+                            if hash != bundle_config.texlive_hash {
+                                error!(
+                                    tectonic_log_source = "select",
+                                    "texlive hash doesn't match, refusing to continue"
+                                );
+                                return Ok(());
+                            }
+                        }
+            d*/
 
-            picker.add_tree("include", &bundle_dir.join("include"))?;
-            picker.add_tree("texlive", &source_dir)?;
+            let mut picker = FilePicker::new(bundle_config.clone(), build_dir.clone())?;
+
+            let source_dir = PathBuf::from("../build/texlive/texlive-20230313-texmf");
+            picker.add_source("include", &bundle_dir.join("include"))?;
+            picker.add_source("texlive", &source_dir)?;
 
             picker.finish(true)?;
             info!(
@@ -136,7 +157,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut hash = String::new();
                 file.read_to_string(&mut hash)?;
                 let hash = hash.trim();
-                if hash != bundle_config.result_hash {
+                if hash != bundle_config.bundle.expected_hash {
                     warn!(
                         tectonic_log_source = "select",
                         "bundle hash doesn't match bundle.toml!"
@@ -157,16 +178,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut file = File::open(bundle_dir.join("bundle.toml"))?;
             let mut file_str = String::new();
             file.read_to_string(&mut file_str)?;
-            let bundle_config: BundleConfig = toml::from_str(&file_str)?;
+            let bundle_config: BundleSpec = toml::from_str(&file_str)?;
 
-            let build_dir = build_dir.join("output").join(&bundle_config.name);
+            let build_dir = build_dir.join("output").join(&bundle_config.bundle.name);
 
             if !build_dir.join("content").is_dir() {
                 error!("content directory `{build_dir:?}/content` doesn't exist, can't continue");
                 return Ok(());
             }
 
-            let target_name = format!("{}.ttb", &bundle_config.name);
+            let target_name = format!("{}.ttb", &bundle_config.bundle.name);
             let target = build_dir.join(&target_name);
             if target.exists() {
                 if target.is_file() {
