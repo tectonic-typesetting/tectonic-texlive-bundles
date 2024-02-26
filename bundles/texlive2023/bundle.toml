@@ -1,25 +1,8 @@
+[bundle]
 name = "texlive2023"
+expected_hash = "442a4d6e136965fb5ad5110efc8074584eb7e61f98340abec220d7d0fad2d887"
 
-texlive_name = "texlive-20230313-texmf"
-texlive_hash = "ac1683d4abeb7fd534851ad7ff0ec891da7da4729603506efd0245259dcdcc67"
-result_hash = "442a4d6e136965fb5ad5110efc8074584eb7e61f98340abec220d7d0fad2d887"
-
-
-search_order = [
-    "/",
-    "/include//",
-    "/texlive/tex/{xelatex,latex,xetex,plain,generic}//",
-    "/texlive/bibtex/{bib,bst,csf}//",
-    "/texlive/web2c//",
-    "/texlive/fonts//",
-    "/texlive/biber//",
-    "/texlive/mft//",
-    "/texlive/dvips//",
-    "/texlive/makeindex//",
-    "/texlive/{web,cweb}//",
-    "/texlive/ttf2pk//",
-    "/texlive/dvipdfmx/",
-]
+search_order = ["/", { input = "include" }, { input = "texlive" }]
 
 # Note the triple-quoted multiline strings:
 # this is the best way to get raw strings in TOML.
@@ -38,39 +21,66 @@ ignore = [
     '''.*\.mf''',
     '''.*\.pl''',
     '''.*\.ps''',
+]
 
+
+[inputs."include"]
+source.type = "directory"
+source.path = "include"
+
+# texlive-20230313-texmf
+[inputs."texlive"]
+source.type = "tarball"
+source.hash = "ac1683d4abeb7fd534851ad7ff0ec891da7da4729603506efd0245259dcdcc67"
+patch_dir = "patches/texlive"
+
+ignore = [
     # I don't think tectonic has xindy support, ignore for now
-    '''/texlive/xindy/.*''',
+    '''xindy/.*''',
 
     # We may need this, but exclude for now.
-    '''/texlive/tex4ht/.*''',
+    '''tex4ht/.*''',
 
     # These require pLaTeX2e, tectonic uses XeTeX
-    '''/texlive/tex/uplatex/.*''',
-    '''/texlive/tex/uptex/.*''',
+    '''tex/uplatex/.*''',
+    '''tex/uptex/.*''',
 
     # Other odd tex formats & unnecessary files
-    '''/texlive/tex/cslatex/.*''',
-    '''/texlive/tex/csplain/.*''',
-    '''/texlive/tex/ptex/.*''',
-    '''/texlive/tex/platex/.*''',
-    '''/texlive/tex/lollipop/.*''',
-    '''/texlive/tex/context/.*''',
-    '''/texlive/context/.*''',
-    '''/texlive/texdoc/.*''',
-    '''/texlive/texdoctk/.*''',
-    '''/texlive/texconfig/.*''',
-    '''/texlive/scripts/.*''',
-    '''/texlive/dvips/.*''',
-    '''/texlive/asymptote/.*''',
-    '''/texlive/makeindex/.*''',
-    '''/texlive/luatex-cache/.*''',
-    '''/texlive/hb2gf/.*''',
-    '''/texlive/chktex/.*''',
-    '''/texlive/source/.*''',
-    '''/texlive/doc/.*''',
-    '''/texlive/tex/luatex/.*''',
-    '''/texlive/tex/lualatex/.*''',
-    '''/texlive/tex/lambda/.*''',
-    '''/texlive/omega/.*''',
+    '''tex/cslatex/.*''',
+    '''tex/csplain/.*''',
+    '''tex/ptex/.*''',
+    '''tex/platex/.*''',
+    '''tex/lollipop/.*''',
+    '''tex/context/.*''',
+    '''context/.*''',
+    '''texdoc/.*''',
+    '''texdoctk/.*''',
+    '''texconfig/.*''',
+    '''scripts/.*''',
+    '''dvips/.*''',
+    '''asymptote/.*''',
+    '''makeindex/.*''',
+    '''luatex-cache/.*''',
+    '''hb2gf/.*''',
+    '''chktex/.*''',
+    '''source/.*''',
+    '''doc/.*''',
+    '''tex/luatex/.*''',
+    '''tex/lualatex/.*''',
+    '''tex/lambda/.*''',
+    '''omega/.*''',
+]
+
+search_order = [
+    "tex/{xelatex,latex,xetex,plain,generic}//",
+    "bibtex/{bib,bst,csf}//",
+    "web2c//",
+    "fonts//",
+    "biber//",
+    "mft//",
+    "dvips//",
+    "makeindex//",
+    "{web,cweb}//",
+    "ttf2pk//",
+    "dvipdfmx/",
 ]
