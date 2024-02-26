@@ -8,6 +8,7 @@ use std::{
     io::{stdout, BufRead, BufReader, Read, Seek, Write},
     path::PathBuf,
 };
+use tracing::info;
 
 // Size of ttbv1 header.
 const HEADER_SIZE: u64 = 66u64;
@@ -58,11 +59,6 @@ impl BundleV1 {
         bundle.write_index()?;
         bundle.write_header()?;
 
-        println!(
-            "\nIndex is at {}, {}",
-            bundle.index_start, bundle.index_gzip_len
-        );
-
         Ok(())
     }
 
@@ -86,11 +82,9 @@ impl BundleV1 {
         let filelist_file = File::open(self.content_dir.join("FILELIST"))?;
         let reader = BufReader::new(filelist_file);
 
-        let mut count = 0usize;
+        info!(tectonic_log_source = "bundle", "Building ttbv1 bundle...");
 
         for line in reader.lines() {
-            count += 1;
-            print!("\rBuilding V1 Bundle... {}", count);
             stdout().flush()?;
 
             let line = line?;
@@ -124,8 +118,8 @@ impl BundleV1 {
             }
         }
 
-        println!("\rBuilding V1 Bundle... {}  Done.", count);
-        println!(
+        info!(
+            tectonic_log_source = "bundle",
             "Average compression ratio: {:.2}",
             real_len_sum as f64 / byte_count as f64
         );
@@ -143,6 +137,8 @@ impl BundleV1 {
 
         // Get current position
         self.index_start = self.target.stream_position()?;
+
+        info!(tectonic_log_source = "bundle", "Writing index");
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         let mut real_len = 0usize;
@@ -167,11 +163,18 @@ impl BundleV1 {
         self.index_gzip_len = gzip_len as u32;
         self.index_real_len = real_len as u32;
 
+        info!(
+            tectonic_log_source = "bundle",
+            "index is at {} and has length {}", self.index_start, self.index_gzip_len
+        );
+
         Ok(())
     }
 
     fn write_header(&mut self) -> Result<u64> {
         self.target.seek(std::io::SeekFrom::Start(0))?;
+
+        info!(tectonic_log_source = "bundle", "Writing header");
 
         // Parse bundle hash
         let mut hash_file = File::open(self.content_dir.join("SHA256SUM")).unwrap();

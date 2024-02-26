@@ -3,6 +3,7 @@ use anyhow::Context;
 use clap::{Parser, Subcommand, ValueEnum};
 use log::LogFormatter;
 use std::{
+    cmp::Ordering,
     error::Error,
     fs::{self, File},
     io::Read,
@@ -55,7 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
     tracing_subscriber::fmt()
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::INFO)
         .event_format(LogFormatter::new(true))
         .init();
 
@@ -74,7 +75,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Remove build dir if it exists
             let build_dir = build_dir.join("output").join(&bundle_config.name);
             if build_dir.exists() {
-                info!("removing build dir {build_dir:?}");
+                info!(
+                    tectonic_log_source = "select",
+                    "removing build dir {build_dir:?}"
+                );
                 fs::remove_dir_all(&build_dir)?;
             }
             fs::create_dir_all(&build_dir).context("while creating build dir")?;
@@ -86,7 +90,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 file.read_to_string(&mut hash)?;
                 let hash = hash.trim();
                 if hash != bundle_config.texlive_hash {
-                    error!("texlive hash doesn't match, refusing to continue");
+                    error!(
+                        tectonic_log_source = "select",
+                        "texlive hash doesn't match, refusing to continue"
+                    );
                     return Ok(());
                 }
             }
@@ -101,7 +108,27 @@ fn main() -> Result<(), Box<dyn Error>> {
             picker.add_tree("texlive", &source_dir)?;
 
             picker.finish(true)?;
-            print!("{}", picker.stats.make_string());
+            info!(
+                tectonic_log_source = "select",
+                "summary is below:\n{}",
+                picker.stats.make_string()
+            );
+
+            match picker.stats.compare_patch_found_applied() {
+                Ordering::Equal => {}
+                Ordering::Greater => {
+                    warn!(
+                        tectonic_log_source = "select",
+                        "some patches were not applied"
+                    );
+                }
+                Ordering::Less => {
+                    warn!(
+                        tectonic_log_source = "select",
+                        "some patches applied multiple times"
+                    );
+                }
+            }
 
             // Check output hash
             {
@@ -109,9 +136,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut hash = String::new();
                 file.read_to_string(&mut hash)?;
                 let hash = hash.trim();
-                info!("bundle hash is `{hash}`");
                 if hash != bundle_config.result_hash {
-                    warn!("bundle hash doesn't match bundle.toml!")
+                    warn!(
+                        tectonic_log_source = "select",
+                        "bundle hash doesn't match bundle.toml!"
+                    )
+                } else {
+                    info!(
+                        tectonic_log_source = "select",
+                        "bundle hash matches bundle.toml"
+                    );
                 }
             }
         }
@@ -132,13 +166,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 return Ok(());
             }
 
-            let target = build_dir.join(format!("{}.ttb", &bundle_config.name));
+            let target_name = format!("{}.ttb", &bundle_config.name);
+            let target = build_dir.join(&target_name);
             if target.exists() {
                 if target.is_file() {
-                    warn!("target bundle `{target:?}` exists, removing");
+                    warn!("target bundle `{target_name}` exists, removing");
                     fs::remove_file(&target)?;
                 } else {
-                    error!("target bundle `{target:?}` exists and isn't a file, can't continue");
+                    error!("target bundle `{target_name}` exists and isn't a file, can't continue");
                     return Ok(());
                 }
             }

@@ -3,14 +3,15 @@ use regex::Regex;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     fmt::Display,
     fs::{self, File},
     io::Write,
-    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
+use tracing::{debug, info, trace, warn};
 use walkdir::WalkDir;
 
 #[derive(Deserialize)]
@@ -60,10 +61,10 @@ pub struct PickStatistics {
 }
 
 impl PickStatistics {
+    /// Returns a pretty status summary string
     pub fn make_string(&self) -> String {
         let mut output_string = format!(
             concat!(
-                "\n",
                 "=============== Summary ===============\n",
                 "    extra file conflicts: {}\n",
                 "    files ignored:        {}\n",
@@ -88,16 +89,13 @@ impl PickStatistics {
         }
         output_string.push_str(&format!("    total files:          {sum}\n\n"));
 
-        //if self.diffs.len() > self.patch_applied {
-        //    println!("Warning: not all diffs were applied")
-        //}
-
-        //if self.diffs.len() < self.patch_applied {
-        //    println!("Warning: some diffs were applied multiple times")
-        //}
-
-        output_string.push_str(&format!("{}\n", "=".repeat(39)));
+        output_string.push_str(&format!("{}", "=".repeat(39)));
         output_string
+    }
+
+    /// Did we find as many, fewer, or more patches than we applied?
+    pub fn compare_patch_found_applied(&self) -> Ordering {
+        self.patch_found.cmp(&self.patch_applied)
     }
 }
 
@@ -212,17 +210,11 @@ impl FilePicker {
             return Ok(false);
         }
 
-        // Debug print
-        /*
-        let s = format!(
-            "Patching {}",
-            path.file_name()
-                .ok_or("Couldn't get file name".to_string())?
-                .to_str()
-                .ok_or("Couldn't get file name as str".to_string())?
+        info!(
+            tectonic_log_source = "select",
+            "patching `{}`",
+            path_rel.to_str().unwrap()
         );
-        */
-
         self.stats.patch_applied += 1;
 
         // Discard first line of diff
@@ -234,18 +226,26 @@ impl FilePicker {
             .arg("--no-backup")
             .arg(path)
             .stdin(Stdio::piped())
-            .spawn()?;
+            .spawn()
+            .context("while spawning `patch`")?;
 
         let mut stdin = child.stdin.take().unwrap();
-        stdin.write_all(diff.as_bytes())?;
+        stdin
+            .write_all(diff.as_bytes())
+            .context("while passing diff to `patch`")?;
         drop(stdin);
-        child.wait()?;
+        child.wait().context("while waiting for `patch`")?;
 
         Ok(true)
     }
 
     /// Add a file into the file list.
     fn add_to_filelist(&mut self, path: PathBuf, file: Option<&Path>) -> Result<()> {
+        trace!(
+            tectonic_log_source = "select",
+            "adding `{path:?}` to file list"
+        );
+
         self.filelist.insert(
             path.clone(),
             FileListEntry {
@@ -285,27 +285,37 @@ impl FilePicker {
             .unwrap()
             .to_path_buf();
 
+        trace!(
+            tectonic_log_source = "select",
+            "adding {path:?} from source `{source}`"
+        );
+
         // Skip files that already exist
         if self.filelist.contains_key(&rel) {
             self.stats.extra_conflict += 1;
-            println!("Warning: file {path:?} has conflicts, ignoring");
+            warn!(
+                tectonic_log_source = "select",
+                "{path:?} from source `{source}` already exists, skipping"
+            );
             return Ok(());
         }
 
         fs::create_dir_all(match target_path.parent() {
             Some(x) => x,
-            None => bail!("couldn't get parent"),
-        })?;
+            None => bail!("couldn't get parent of target"),
+        })
+        .context("failed to create content directory")?;
 
         // Copy to content dir.
-        // Extracted dir is read-only, we need to chmod to patch.
-        fs::copy(path, &target_path)?;
-        fs::set_permissions(&target_path, fs::Permissions::from_mode(0o664))?;
+        fs::copy(path, &target_path)
+            .with_context(|| format!("while copying file `{path:?}` from source `{source}`"))?;
 
         // Apply patch if one exists
-        self.apply_patch(&target_path)?;
+        self.apply_patch(&target_path)
+            .with_context(|| format!("while patching `{path:?}` from source `{source}`"))?;
 
-        self.add_to_filelist(rel, Some(&target_path))?;
+        self.add_to_filelist(rel, Some(&target_path))
+            .with_context(|| format!("while adding file `{path:?}` from source `{source}`"))?;
 
         Ok(())
     }
@@ -367,24 +377,21 @@ impl FilePicker {
                 continue;
             }
 
-            let name = match entry.file_name() {
-                Some(x) => match x.to_str() {
-                    Some(x) => x,
-                    None => bail!("Couldn't get file name as str"),
-                },
-                None => bail!("Couldn't get file name"),
-            };
-
             // Read first line of diff to get target path
             let diff_file = fs::read_to_string(&entry).unwrap();
             let (target, _) = diff_file.split_once('\n').unwrap();
+
+            trace!(tectonic_log_source = "select", "adding diff {entry:?}");
 
             for t in Self::expand_search_line(target)?
                 .into_iter()
                 .map(PathBuf::from)
             {
                 if self.diffs.contains_key(&t) {
-                    println!("Warning: diff {name} has target conflict, ignoring");
+                    warn!(
+                        tectonic_log_source = "select",
+                        "the target of diff {entry:?} conflicts with another ignoring"
+                    );
                     continue;
                 }
 
@@ -398,7 +405,7 @@ impl FilePicker {
 
     /// Add a directory of files to this bundle under `source_name`,
     /// applying patches and checking for replacements.
-    pub fn add_tree(&mut self, source_name: &str, path: &Path) -> Result<()> {
+    pub fn add_tree(&mut self, source: &str, path: &Path) -> Result<()> {
         let mut added = 0usize;
 
         for entry in WalkDir::new(path) {
@@ -410,28 +417,44 @@ impl FilePicker {
             let entry = entry.into_path();
 
             // Skip ignored files
-            if self.ignore_file(
-                source_name,
-                entry.strip_prefix(path).unwrap().to_str().unwrap(),
-            ) {
+            if self.ignore_file(source, entry.strip_prefix(path).unwrap().to_str().unwrap()) {
+                debug!(
+                    tectonic_log_source = "select",
+                    "skipping file {entry:?} from source `{source}` because of ignore patterns"
+                );
                 self.stats.ignored += 1;
                 continue;
             }
 
+            if self.filelist.len() % 1937 == 0 {
+                info!(
+                    tectonic_log_source = "select",
+                    "selecting files ({source}, {})",
+                    self.filelist.len()
+                );
+            }
+
+            trace!(
+                tectonic_log_source = "select",
+                "adding file {entry:?} from source `{source}`"
+            );
+
             self.add_file(
                 &entry,
-                source_name,
+                source,
                 entry.strip_prefix(path).unwrap().to_str().unwrap(),
             )?;
             added += 1;
         }
 
-        self.stats.added.insert(source_name.to_owned(), added);
+        self.stats.added.insert(source.to_owned(), added);
 
         Ok(())
     }
 
     pub fn finish(&mut self, save_debug_files: bool) -> Result<()> {
+        info!(tectonic_log_source = "select", "writing auxillary files...");
+
         // Save search specification
         {
             let path = self.build_dir.join("content/SEARCH");
