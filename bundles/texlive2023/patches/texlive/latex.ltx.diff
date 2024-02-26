@@ -1,4 +1,4 @@
-texlive/tex/{latex,latex-dev}/base/latex.ltx
+tex/{latex,latex-dev}/base/latex.ltx
 7211,7237c7211,7212
 <      \typeout{^^J! LaTeX Error: File `#1.#2' not found.^^J^^J%
 <       Type X to quit or <RETURN> to proceed,^^J%

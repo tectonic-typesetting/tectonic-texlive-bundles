@@ -1,4 +1,4 @@
-texlive/tex/latex/listings/listings.sty
+tex/latex/listings/listings.sty
 2057,2075c2057,2059
 <     \typeout{^^J! Package Listings Error: File `#1(.#2)' not found.^^J%
 <         ^^JType X to quit or <RETURN> to proceed,^^J%
