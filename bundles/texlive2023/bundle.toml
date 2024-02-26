@@ -25,13 +25,14 @@ ignore = [
 
 
 [inputs."include"]
-source.type = "directory"
-source.path = "include"
+source.dir.path = "include"
 
 # texlive-20230313-texmf
 [inputs."texlive"]
-source.type = "tarball"
-source.hash = "ac1683d4abeb7fd534851ad7ff0ec891da7da4729603506efd0245259dcdcc67"
+source.tarball.path = "../../texlive-20230313-texmf.tar"
+source.tarball.hash = "ac1683d4abeb7fd534851ad7ff0ec891da7da4729603506efd0245259dcdcc67"
+source.tarball.root_dir = "texlive-20230313-texmf/texmf-dist"
+#source.url = "https://ftp.math.utah.edu/pub/tex/historic/systems/texlive/2023/texlive-20230313-texmf.tar.xz"
 patch_dir = "patches/texlive"
 
 ignore = [

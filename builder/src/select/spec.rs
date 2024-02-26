@@ -59,16 +59,14 @@ pub struct BundleInput {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-#[serde(untagged)]
 pub enum BundleInputSource {
-    Directory {
-        #[serde(rename = "type")]
-        source_type: String,
-        path: PathBuf,
-    },
+    #[serde(rename = "dir")]
+    Directory { path: PathBuf },
+
+    #[serde(rename = "tarball")]
     Tarball {
-        #[serde(rename = "type")]
-        source_type: String,
         hash: String,
+        path: PathBuf,
+        root_dir: Option<PathBuf>,
     },
 }
