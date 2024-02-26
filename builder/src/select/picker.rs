@@ -6,33 +6,29 @@ use std::{
     collections::HashMap,
     fmt::Display,
     fs::{self, File},
-    io::Write,
+    io::{self, Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 use tracing::{debug, info, trace, warn};
 use walkdir::WalkDir;
 
-use crate::select::spec::BundleSearchOrder;
-
-use super::spec::BundleSpec;
+use super::{
+    input::Input,
+    spec::BundleSearchOrder,
+    spec::{BundleInputSource, BundleSpec},
+};
 
 #[derive(Default)]
 pub struct PickStatistics {
     /// Total number of files added from each source
     added: HashMap<String, usize>,
 
-    /// Number of extra files added
-    extra: usize,
-
-    /// Number of extra file conflicts
-    extra_conflict: usize,
+    /// Number of file conflicts
+    conflicts: usize,
 
     /// Total number of files ignored
     ignored: usize,
-
-    /// Total number of files replaced
-    replaced: usize,
 
     /// Total number of patches applied
     patch_applied: usize,
@@ -47,22 +43,15 @@ impl PickStatistics {
         let mut output_string = format!(
             concat!(
                 "=============== Summary ===============\n",
-                "    extra file conflicts: {}\n",
+                "    file conflicts:       {}\n",
                 "    files ignored:        {}\n",
-                "    files replaced:       {}\n",
                 "    diffs applied/found:  {}/{}\n",
                 "    =============================\n",
-                "    extra files:          {}\n",
             ),
-            self.extra_conflict,
-            self.ignored,
-            self.replaced,
-            self.patch_applied,
-            self.patch_found,
-            self.extra,
+            self.conflicts, self.ignored, self.patch_applied, self.patch_found,
         );
 
-        let mut sum = self.extra;
+        let mut sum = 0;
         for (source, count) in &self.added {
             let s = format!("{source} files: ");
             output_string.push_str(&format!("    {s}{}{count}\n", " ".repeat(22 - s.len())));
@@ -101,6 +90,10 @@ impl Display for FileListEntry {
 }
 
 pub struct FilePicker {
+    /// This bundle specification's root directory.
+    /// (i.e, where we found bundle.toml)
+    bundle_dir: PathBuf,
+
     /// Where to place this bundle's files
     build_dir: PathBuf,
 
@@ -163,27 +156,26 @@ impl FilePicker {
 
     /// Patch a file in-place.
     /// This should be done after calling `add_file`.
-    fn apply_patch(&mut self, path: &Path, diffs: &HashMap<PathBuf, PathBuf>) -> Result<bool> {
-        // path is absolute, but self.diffs is indexed by
-        // paths relative to content dir.
-        let path_rel = path
-            .strip_prefix(&self.build_dir.join("content"))
-            .context("tried to patch file outside of build direcory")?;
-
+    fn apply_patch(
+        &mut self,
+        path: &Path,
+        path_in_source: &Path,
+        diffs: &HashMap<PathBuf, PathBuf>,
+    ) -> Result<bool> {
         // Is this file patched?
-        if !diffs.contains_key(path_rel) {
+        if !diffs.contains_key(path_in_source) {
             return Ok(false);
         }
 
         info!(
             tectonic_log_source = "select",
             "patching `{}`",
-            path_rel.to_str().unwrap()
+            path_in_source.to_str().unwrap()
         );
         self.stats.patch_applied += 1;
 
         // Discard first line of diff
-        let diff_file = fs::read_to_string(&diffs[path_rel]).unwrap();
+        let diff_file = fs::read_to_string(&diffs[path_in_source]).unwrap();
         let (_, diff) = diff_file.split_once('\n').unwrap();
 
         let mut child = Command::new("patch")
@@ -243,16 +235,16 @@ impl FilePicker {
     /// Add a file to this picker's content directory
     fn add_file(
         &mut self,
-        path: &Path,
+        path_in_source: &Path,
         source: &str,
-        file_rel_path: &str,
+        file_content: &mut dyn Read,
         diffs: &HashMap<PathBuf, PathBuf>,
     ) -> Result<()> {
         let target_path = self
             .build_dir
             .join("content")
             .join(source)
-            .join(file_rel_path);
+            .join(path_in_source);
 
         // Path to this file, relative to content dir
         let rel = target_path
@@ -262,15 +254,15 @@ impl FilePicker {
 
         trace!(
             tectonic_log_source = "select",
-            "adding {path:?} from source `{source}`"
+            "adding {path_in_source:?} from source `{source}`"
         );
 
         // Skip files that already exist
         if self.filelist.contains_key(&rel) {
-            self.stats.extra_conflict += 1;
+            self.stats.conflicts += 1;
             warn!(
                 tectonic_log_source = "select",
-                "{path:?} from source `{source}` already exists, skipping"
+                "{path_in_source:?} from source `{source}` already exists, skipping"
             );
             return Ok(());
         }
@@ -282,15 +274,21 @@ impl FilePicker {
         .context("failed to create content directory")?;
 
         // Copy to content dir.
-        fs::copy(path, &target_path)
-            .with_context(|| format!("while copying file `{path:?}` from source `{source}`"))?;
+        let mut file = fs::File::create(&target_path)?;
+        io::copy(file_content, &mut file).with_context(|| {
+            format!("while writing file `{path_in_source:?}` from source `{source}`")
+        })?;
 
         // Apply patch if one exists
-        self.apply_patch(&target_path, diffs)
-            .with_context(|| format!("while patching `{path:?}` from source `{source}`"))?;
+        self.apply_patch(&target_path, path_in_source, diffs)
+            .with_context(|| {
+                format!("while patching `{path_in_source:?}` from source `{source}`")
+            })?;
 
         self.add_to_filelist(rel, Some(&target_path))
-            .with_context(|| format!("while adding file `{path:?}` from source `{source}`"))?;
+            .with_context(|| {
+                format!("while adding file `{path_in_source:?}` from source `{source}`")
+            })?;
 
         Ok(())
     }
@@ -299,7 +297,7 @@ impl FilePicker {
 // Public methods
 impl FilePicker {
     /// Create a new file picker working in build_dir
-    pub fn new(bundle_spec: BundleSpec, build_dir: PathBuf) -> Result<Self> {
+    pub fn new(bundle_spec: BundleSpec, build_dir: PathBuf, bundle_dir: PathBuf) -> Result<Self> {
         if !build_dir.is_dir() {
             bail!("build_dir is not a directory!")
         }
@@ -309,6 +307,7 @@ impl FilePicker {
         }
 
         Ok(FilePicker {
+            bundle_dir,
             build_dir,
             filelist: HashMap::new(),
             bundle_spec,
@@ -318,23 +317,18 @@ impl FilePicker {
 
     /// Add a directory of files to this bundle under `source_name`,
     /// applying patches and checking for replacements.
-    pub fn add_source(&mut self, source: &str, path: &Path) -> Result<()> {
+    pub fn add_source(&mut self, source: &str) -> Result<()> {
+        let input = self.bundle_spec.inputs.get(source).unwrap();
         let mut added = 0usize;
 
         // Load diff files
-        let diffs = self
-            .bundle_spec
-            .inputs
-            .get(source)
-            .unwrap()
+        let diffs = input
             .patch_dir
             .as_ref()
             .map(|x| -> Result<HashMap<PathBuf, PathBuf>> {
                 let mut diffs = HashMap::new();
 
-                let bundle_dir = PathBuf::from("../bundles/texlive2023/");
-
-                for entry in WalkDir::new(bundle_dir.join(x)) {
+                for entry in WalkDir::new(self.bundle_dir.join(x)) {
                     // Only iterate files
                     let entry = entry?;
                     if !entry.file_type().is_file() {
@@ -391,10 +385,7 @@ impl FilePicker {
 
             // Input patterns
             ignore.extend(
-                self.bundle_spec
-                    .inputs
-                    .get(source)
-                    .unwrap()
+                input
                     .ignore
                     .as_ref()
                     .map(|v| {
@@ -408,18 +399,19 @@ impl FilePicker {
             ignore
         };
 
-        for entry in WalkDir::new(path) {
-            // Only iterate files
-            let entry = entry?;
-            if !entry.file_type().is_file() {
-                continue;
+        let mut source_backend = match &input.source {
+            BundleInputSource::Directory { path, .. } => Input::new_dir(self.bundle_dir.join(path)),
+            BundleInputSource::Tarball { path, root_dir, .. } => {
+                Input::new_tarball(self.bundle_dir.join(path), root_dir.clone())
             }
-            let entry = entry.into_path();
+        };
+
+        for x in source_backend.iter_files() {
+            let (rel_file_path, mut read) = x?;
 
             // Skip ignored files
             if {
-                let file_rel_path = entry.strip_prefix(path).unwrap().to_str().unwrap();
-                let f = format!("/{source}/{file_rel_path}");
+                let f = format!("/{source}/{}", rel_file_path);
                 let mut ignore = false;
                 for pattern in &ignore_patterns {
                     if pattern.is_match(&f) {
@@ -431,7 +423,7 @@ impl FilePicker {
             } {
                 debug!(
                     tectonic_log_source = "select",
-                    "skipping file {entry:?} from source `{source}` because of ignore patterns"
+                    "skipping file {rel_file_path:?} from source `{source}` because of ignore patterns"
                 );
                 self.stats.ignored += 1;
                 continue;
@@ -447,16 +439,11 @@ impl FilePicker {
 
             trace!(
                 tectonic_log_source = "select",
-                "adding file {entry:?} from source `{source}`"
+                "adding file {rel_file_path:?} from source `{source}`"
             );
 
-            self.add_file(
-                &entry,
-                source,
-                entry.strip_prefix(path).unwrap().to_str().unwrap(),
-                &diffs,
-            )
-            .with_context(|| format!("while adding file `{entry:?}`"))?;
+            self.add_file(Path::new(&rel_file_path), source, &mut read, &diffs)
+                .with_context(|| format!("while adding file `{rel_file_path:?}`"))?;
             added += 1;
         }
 
@@ -466,8 +453,7 @@ impl FilePicker {
     }
 
     pub fn finish(&mut self, save_debug_files: bool) -> Result<()> {
-        info!(tectonic_log_source = "select", "writing auxillary files...");
-        trace!(tectonic_log_source = "select", "writing SEARCH");
+        info!(tectonic_log_source = "select", "writing auxillary files");
 
         // Save search specification
         let search = {
@@ -514,8 +500,6 @@ impl FilePicker {
             self.add_to_filelist(PathBuf::from("SHA256SUM"), None)?;
             self.add_to_filelist(PathBuf::from("FILELIST"), None)?;
 
-            trace!(tectonic_log_source = "select", "writing FILELIST");
-
             let mut filelist_vec = Vec::from_iter(self.filelist.values());
             filelist_vec.sort_by(|a, b| a.path.cmp(&b.path));
 
@@ -526,8 +510,6 @@ impl FilePicker {
             for entry in filelist_vec {
                 writeln!(file, "{entry}")?;
             }
-
-            trace!(tectonic_log_source = "select", "writing SHA256SUM");
 
             // Compute and save hash
             let mut file = File::create(self.build_dir.join("content/SHA256SUM"))

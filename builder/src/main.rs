@@ -103,9 +103,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             fs::create_dir_all(&build_dir).context("while creating build dir")?;
 
             /*
-                        let source_dir = PathBuf::from("../build/texlive/").join(&bundle_config.texlive_name);
-
-
                         // Check input hash
                         {
                             let mut file = File::open(source_dir.join("TEXLIVE-SHA256SUM"))?;
@@ -120,13 +117,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 return Ok(());
                             }
                         }
-            d*/
+            */
 
-            let mut picker = FilePicker::new(bundle_config.clone(), build_dir.clone())?;
+            let mut picker =
+                FilePicker::new(bundle_config.clone(), build_dir.clone(), bundle_dir.clone())?;
 
-            let source_dir = PathBuf::from("../build/texlive/texlive-20230313-texmf");
-            picker.add_source("include", &bundle_dir.join("include"))?;
-            picker.add_source("texlive", &source_dir)?;
+            picker.add_source("include")?;
+            picker.add_source("texlive")?;
 
             picker.finish(true)?;
             info!(
