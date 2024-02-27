@@ -18,8 +18,8 @@ impl<'a> Input {
         Self::Directory(dir::DirBundleInput::new(path))
     }
 
-    pub fn new_tarball(path: PathBuf, root: Option<PathBuf>) -> Self {
-        Self::Tarball(tar::TarBundleInput::new(path, root))
+    pub fn new_tarball(path: PathBuf, root: Option<PathBuf>) -> Result<Self> {
+        Ok(Self::Tarball(tar::TarBundleInput::new(path, root)?))
     }
 
     pub fn iter_files(
@@ -28,6 +28,13 @@ impl<'a> Input {
         match self {
             Self::Directory(x) => Box::new(x.iter_files()),
             Self::Tarball(x) => Box::new(x.iter_files()),
+        }
+    }
+
+    pub fn hash(&self) -> Option<&str> {
+        match self {
+            Self::Directory(_) => None,
+            Self::Tarball(x) => Some(x.hash()),
         }
     }
 }

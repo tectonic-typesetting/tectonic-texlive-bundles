@@ -1,6 +1,6 @@
 [bundle]
 name = "texlive2023"
-expected_hash = "442a4d6e136965fb5ad5110efc8074584eb7e61f98340abec220d7d0fad2d887"
+expected_hash = "c1bbb5f8498d2bb5471cc2b0790700ecb86fc992ec290f7eb718d8751f8ada2a"
 
 search_order = ["/", { input = "include" }, { input = "texlive" }]
 
@@ -28,11 +28,11 @@ ignore = [
 source.dir.path = "include"
 
 # texlive-20230313-texmf
+# https://ftp.math.utah.edu/pub/tex/historic/systems/texlive/2023/texlive-20230313-texmf.tar.xz
 [inputs."texlive"]
-source.tarball.path = "../../texlive-20230313-texmf.tar"
+source.tarball.path = "texlive-20230313-texmf.tar"
 source.tarball.hash = "ac1683d4abeb7fd534851ad7ff0ec891da7da4729603506efd0245259dcdcc67"
 source.tarball.root_dir = "texlive-20230313-texmf/texmf-dist"
-#source.url = "https://ftp.math.utah.edu/pub/tex/historic/systems/texlive/2023/texlive-20230313-texmf.tar.xz"
 patch_dir = "patches/texlive"
 
 ignore = [

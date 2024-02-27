@@ -102,23 +102,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             fs::create_dir_all(&build_dir).context("while creating build dir")?;
 
-            /*
-                        // Check input hash
-                        {
-                            let mut file = File::open(source_dir.join("TEXLIVE-SHA256SUM"))?;
-                            let mut hash = String::new();
-                            file.read_to_string(&mut hash)?;
-                            let hash = hash.trim();
-                            if hash != bundle_config.texlive_hash {
-                                error!(
-                                    tectonic_log_source = "select",
-                                    "texlive hash doesn't match, refusing to continue"
-                                );
-                                return Ok(());
-                            }
-                        }
-            */
-
             let mut picker =
                 FilePicker::new(bundle_config.clone(), build_dir.clone(), bundle_dir.clone())?;
 
@@ -157,13 +140,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 if hash != bundle_config.bundle.expected_hash {
                     warn!(
                         tectonic_log_source = "select",
-                        "bundle hash doesn't match bundle.toml!"
-                    )
+                        "final bundle hash doesn't match bundle configuration:"
+                    );
+                    warn!(tectonic_log_source = "select", "bundle hash is {hash}");
+                    warn!(
+                        tectonic_log_source = "select",
+                        "config hash is {}", bundle_config.bundle.expected_hash
+                    );
                 } else {
                     info!(
                         tectonic_log_source = "select",
-                        "bundle hash matches bundle.toml"
+                        "final bundle hash matches configuration"
                     );
+                    info!(tectonic_log_source = "select", "hash is {hash}");
                 }
             }
         }

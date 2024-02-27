@@ -1,19 +1,52 @@
 use super::BundleInput;
 use anyhow::Result;
-use std::{fs::File, io::Read, path::PathBuf};
+use sha2::{Digest, Sha256};
+use std::{
+    fs::File,
+    io::{Read, Seek},
+    path::PathBuf,
+};
 use tar::Archive;
+use tracing::info;
 
 pub struct TarBundleInput {
     archive: Archive<File>,
     root: PathBuf,
+    hash: String,
 }
 
 impl TarBundleInput {
-    pub fn new(path: PathBuf, root: Option<PathBuf>) -> Self {
-        Self {
-            archive: Archive::new(File::open(&path).unwrap()),
+    pub fn new(path: PathBuf, root: Option<PathBuf>) -> Result<Self> {
+        let path = path.canonicalize().unwrap();
+        let mut file = File::open(&path)?;
+
+        info!(
+            tectonic_log_source = "select",
+            "computing hash of {}",
+            path.to_str().unwrap()
+        );
+
+        let hash = {
+            let mut hasher = Sha256::new();
+            let _ = std::io::copy(&mut file, &mut hasher)?;
+            hasher
+                .finalize()
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<Vec<_>>()
+                .concat()
+        };
+
+        file.seek(std::io::SeekFrom::Start(0))?;
+        Ok(Self {
+            archive: Archive::new(file),
             root: root.unwrap_or(PathBuf::from("")),
-        }
+            hash,
+        })
+    }
+
+    pub fn hash(&self) -> &str {
+        &self.hash
     }
 }
 

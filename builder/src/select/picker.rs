@@ -6,11 +6,11 @@ use std::{
     collections::HashMap,
     fmt::Display,
     fs::{self, File},
-    io::{self, Read, Write},
+    io::{self, Cursor, Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use walkdir::WalkDir;
 
 use super::{
@@ -318,6 +318,8 @@ impl FilePicker {
     /// Add a directory of files to this bundle under `source_name`,
     /// applying patches and checking for replacements.
     pub fn add_source(&mut self, source: &str) -> Result<()> {
+        info!(tectonic_log_source = "select", "adding source `{source}`");
+
         let input = self.bundle_spec.inputs.get(source).unwrap();
         let mut added = 0usize;
 
@@ -401,8 +403,34 @@ impl FilePicker {
 
         let mut source_backend = match &input.source {
             BundleInputSource::Directory { path, .. } => Input::new_dir(self.bundle_dir.join(path)),
-            BundleInputSource::Tarball { path, root_dir, .. } => {
-                Input::new_tarball(self.bundle_dir.join(path), root_dir.clone())
+            BundleInputSource::Tarball {
+                path,
+                root_dir,
+                hash,
+            } => {
+                let x = Input::new_tarball(self.bundle_dir.join(path), root_dir.clone()).unwrap();
+                let hash = hash.clone();
+                self.add_file(
+                    Path::new("TAR-SHA256SUM"),
+                    source,
+                    &mut Cursor::new(format!("{}\n", x.hash().unwrap())),
+                    &HashMap::new(),
+                )?;
+
+                if x.hash().unwrap() != hash {
+                    error!(
+                        tectonic_log_source = "select",
+                        "hash of tarball for source `{source}` doesn't match expected value"
+                    );
+                    bail!("hash of tarball for source `{source}` doesn't match expected value")
+                } else {
+                    info!(
+                        tectonic_log_source = "select",
+                        "OK, tar hash matches bundle config"
+                    )
+                }
+
+                x
             }
         };
 
@@ -429,7 +457,8 @@ impl FilePicker {
                 continue;
             }
 
-            if self.filelist.len() % 1937 == 0 {
+            // Debug info
+            if self.filelist.len() % 1937 == 1936 {
                 info!(
                     tectonic_log_source = "select",
                     "selecting files ({source}, {})",
