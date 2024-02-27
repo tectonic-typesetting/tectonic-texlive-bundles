@@ -2,7 +2,6 @@ use super::util::{decode_hex, WriteSeek};
 use anyhow::{bail, Result};
 use flate2::{write::GzEncoder, Compression};
 use std::{
-    error::Error,
     fmt::Display,
     fs::{self, File},
     io::{stdout, BufRead, BufReader, Read, Seek, Write},
@@ -52,7 +51,7 @@ pub struct BundleV1 {
 }
 
 impl BundleV1 {
-    pub fn make(target: Box<dyn WriteSeek>, build_dir: PathBuf) -> Result<(), Box<dyn Error>> {
+    pub fn make(target: Box<dyn WriteSeek>, build_dir: PathBuf) -> Result<()> {
         let mut bundle = BundleV1::new(target, build_dir)?;
 
         bundle.add_files()?;
@@ -62,7 +61,7 @@ impl BundleV1 {
         Ok(())
     }
 
-    fn new(target: Box<dyn WriteSeek>, build_dir: PathBuf) -> Result<BundleV1, Box<dyn Error>> {
+    fn new(target: Box<dyn WriteSeek>, build_dir: PathBuf) -> Result<BundleV1> {
         Ok(BundleV1 {
             filelist: Vec::new(),
             target,
