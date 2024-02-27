@@ -13,6 +13,8 @@ use std::{
 use tracing::{debug, error, info, trace, warn};
 use walkdir::WalkDir;
 
+use crate::cli::Cli;
+
 use super::{
     input::Input,
     spec::BundleSearchOrder,
@@ -315,9 +317,14 @@ impl FilePicker {
         })
     }
 
+    /// Iterate over this bundle's sources
+    pub fn iter_sources(&self) -> impl Iterator<Item = &String> {
+        self.bundle_spec.inputs.keys()
+    }
+
     /// Add a directory of files to this bundle under `source_name`,
     /// applying patches and checking for replacements.
-    pub fn add_source(&mut self, source: &str) -> Result<()> {
+    pub fn add_source(&mut self, cli: &Cli, source: &str) -> Result<()> {
         info!(tectonic_log_source = "select", "adding source `{source}`");
 
         let input = self.bundle_spec.inputs.get(source).unwrap();
@@ -408,7 +415,16 @@ impl FilePicker {
                 root_dir,
                 hash,
             } => {
-                let x = Input::new_tarball(self.bundle_dir.join(path), root_dir.clone()).unwrap();
+                let x = match Input::new_tarball(self.bundle_dir.join(path), root_dir.clone()) {
+                    Ok(x) => x,
+                    Err(e) => {
+                        error!(
+                            tectonic_log_source = "select",
+                            "could not add source `{source}` from tarball"
+                        );
+                        return Err(e);
+                    }
+                };
                 let hash = hash.clone();
                 self.add_file(
                     Path::new("TAR-SHA256SUM"),
@@ -418,17 +434,35 @@ impl FilePicker {
                 )?;
 
                 if x.hash().unwrap() != hash {
-                    error!(
-                        tectonic_log_source = "select",
-                        "hash of tarball for source `{source}` doesn't match expected value"
-                    );
-                    bail!("hash of tarball for source `{source}` doesn't match expected value")
-                } else {
-                    info!(
-                        tectonic_log_source = "select",
-                        "OK, tar hash matches bundle config"
-                    )
+                    if cli.allow_hash_mismatch {
+                        warn!(
+                            tectonic_log_source = "select",
+                            "hash of tarball for source `{source}` doesn't match expected value"
+                        );
+                        warn!(
+                            tectonic_log_source = "select",
+                            "expected: {}",
+                            x.hash().unwrap()
+                        );
+                        warn!(tectonic_log_source = "select", "got:      {}", hash);
+                    } else {
+                        error!(
+                            tectonic_log_source = "select",
+                            "hash of tarball for source `{source}` doesn't match expected value"
+                        );
+                        error!(
+                            tectonic_log_source = "select",
+                            "expected: {}",
+                            x.hash().unwrap()
+                        );
+                        error!(tectonic_log_source = "select", "got:      {}", hash);
+                        bail!("hash of tarball for source `{source}` doesn't match expected value")
+                    }
                 }
+                info!(
+                    tectonic_log_source = "select",
+                    "OK, tar hash matches bundle config"
+                );
 
                 x
             }

@@ -9,6 +9,8 @@ use std::{
     cmp::Ordering,
     fs::{self, File},
     io::Read,
+    thread,
+    time::Duration,
 };
 use tracing::{error, info, warn, Level};
 
@@ -33,41 +35,57 @@ fn select(cli: &cli::Cli) -> Result<()> {
         Err(e) => {
             error!(
                 tectonic_log_source = "select",
-                "failed to load bundle specification: {}",
-                e.message()
+                "failed to load bundle specification",
             );
-            return Ok(());
+            return Err(e.into());
         }
     };
 
     if let Err(e) = bundle_config.validate() {
         error!(
             tectonic_log_source = "select",
-            "failed to validate bundle specification: {e}"
+            "failed to validate bundle specification"
         );
-        return Ok(());
+        return Err(e);
     };
 
     // Remove build dir if it exists
-    let build_dir = cli
-        .build_dir
-        .join("output")
-        .join(&bundle_config.bundle.name);
-    if build_dir.exists() {
-        info!(
+    if cli.build_dir.exists() {
+        warn!(
             tectonic_log_source = "select",
-            "removing build dir {build_dir:?}"
+            "build dir {} aleady exists",
+            cli.build_dir.to_str().unwrap()
         );
-        fs::remove_dir_all(&build_dir)?;
+
+        for i in (1..=5).rev() {
+            warn!(
+                tectonic_log_source = "select",
+                "recursively removing {} in {i} second{}",
+                cli.build_dir.to_str().unwrap(),
+                if i != 1 { "s" } else { "" }
+            );
+            thread::sleep(Duration::from_secs(1));
+        }
+        thread::sleep(Duration::from_secs(2));
+
+        fs::remove_dir_all(&cli.build_dir)?;
     }
-    fs::create_dir_all(&build_dir).context("while creating build dir")?;
+    fs::create_dir_all(&cli.build_dir).context("while creating build dir")?;
 
-    let mut picker = FilePicker::new(bundle_config.clone(), build_dir.clone(), bundle_dir.clone())?;
+    let mut picker = FilePicker::new(
+        bundle_config.clone(),
+        cli.build_dir.clone(),
+        bundle_dir.clone(),
+    )?;
 
-    picker.add_source("include")?;
-    picker.add_source("texlive")?;
-
+    // Run selector
+    let sources: Vec<String> = picker.iter_sources().map(|x| x.to_string()).collect();
+    for source in sources {
+        picker.add_source(cli, &source)?;
+    }
     picker.finish(true)?;
+
+    // Print statistics
     info!(
         tectonic_log_source = "select",
         "summary is below:\n{}",
@@ -92,7 +110,7 @@ fn select(cli: &cli::Cli) -> Result<()> {
 
     // Check output hash
     {
-        let mut file = File::open(build_dir.join("content/SHA256SUM"))?;
+        let mut file = File::open(cli.build_dir.join("content/SHA256SUM"))?;
         let mut hash = String::new();
         file.read_to_string(&mut hash)?;
         let hash = hash.trim();
@@ -124,18 +142,16 @@ fn pack(cli: &cli::Cli) -> Result<()> {
     file.read_to_string(&mut file_str)?;
     let bundle_config: BundleSpec = toml::from_str(&file_str)?;
 
-    let build_dir = cli
-        .build_dir
-        .join("output")
-        .join(&bundle_config.bundle.name);
-
-    if !build_dir.join("content").is_dir() {
-        error!("content directory `{build_dir:?}/content` doesn't exist, can't continue");
+    if !cli.build_dir.join("content").is_dir() {
+        error!(
+            "content directory `{}/content` doesn't exist, can't continue",
+            cli.build_dir.to_str().unwrap()
+        );
         return Ok(());
     }
 
     let target_name = format!("{}.ttb", &bundle_config.bundle.name);
-    let target = build_dir.join(&target_name);
+    let target = cli.build_dir.join(&target_name);
     if target.exists() {
         if target.is_file() {
             warn!("target bundle `{target_name}` exists, removing");
@@ -147,26 +163,52 @@ fn pack(cli: &cli::Cli) -> Result<()> {
     }
 
     match cli.format {
-        cli::BundleFormat::BundleV1 => BundleV1::make(Box::new(File::create(target)?), build_dir)?,
+        cli::BundleFormat::BundleV1 => {
+            BundleV1::make(Box::new(File::create(target)?), cli.build_dir.clone())?
+        }
     }
 
     Ok(())
 }
 
+#[allow(clippy::needless_return)]
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
 
     tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
+        .with_max_level(match cli.log {
+            cli::LogLevel::Debug => Level::DEBUG,
+            cli::LogLevel::Info => Level::INFO,
+            cli::LogLevel::Warn => Level::WARN,
+            cli::LogLevel::Error => Level::ERROR,
+        })
         .event_format(LogFormatter::new(true))
         .init();
 
     if cli.job.do_select() {
-        select(&cli)?;
+        match select(&cli) {
+            Ok(_) => {}
+            Err(e) => {
+                error!(
+                    tectonic_log_source = "select",
+                    "select job failed with error: {e}"
+                );
+                return Err(e);
+            }
+        };
     }
 
     if cli.job.do_pack() {
-        pack(&cli)?;
+        match pack(&cli) {
+            Ok(_) => {}
+            Err(e) => {
+                error!(
+                    tectonic_log_source = "pack",
+                    "bundle packer failed with error: {e}"
+                );
+                return Err(e);
+            }
+        };
     }
 
     Ok(())
