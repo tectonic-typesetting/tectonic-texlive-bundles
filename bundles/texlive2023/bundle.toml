@@ -27,8 +27,10 @@ ignore = [
 [inputs."include"]
 source.dir.path = "include"
 
-# texlive-20230313-texmf
+
+# Requires texlive-20230313-texmf, which is available at
 # https://ftp.math.utah.edu/pub/tex/historic/systems/texlive/2023/texlive-20230313-texmf.tar.xz
+# download and extract this file as a .tar in this directory.
 [inputs."texlive"]
 source.tarball.path = "texlive-20230313-texmf.tar"
 source.tarball.hash = "ac1683d4abeb7fd534851ad7ff0ec891da7da4729603506efd0245259dcdcc67"
