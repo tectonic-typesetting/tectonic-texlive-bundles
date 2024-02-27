@@ -1,6 +1,10 @@
 use super::BundleInput;
 use anyhow::Result;
-use std::{fs, io::Read, path::PathBuf};
+use std::{
+    fs::{self},
+    io::Read,
+    path::PathBuf,
+};
 use walkdir::WalkDir;
 
 pub struct DirBundleInput {

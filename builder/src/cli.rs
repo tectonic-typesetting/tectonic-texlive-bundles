@@ -42,17 +42,11 @@ impl Display for BundleJob {
 
 impl BundleJob {
     pub fn do_select(&self) -> bool {
-        match self {
-            Self::All | Self::Select => true,
-            _ => false,
-        }
+        matches!(self, Self::All | Self::Select)
     }
 
     pub fn do_pack(&self) -> bool {
-        match self {
-            Self::All | Self::Pack => true,
-            _ => false,
-        }
+        matches!(self, Self::All | Self::Pack)
     }
 }
 

@@ -59,7 +59,7 @@ impl PickStatistics {
         }
         output_string.push_str(&format!("    total files:          {sum}\n\n"));
 
-        output_string.push_str(&format!("{}", "=".repeat(39)));
+        output_string.push_str(&"=".repeat(39).to_string());
         output_string
     }
 
@@ -437,8 +437,7 @@ impl FilePicker {
         for x in source_backend.iter_files() {
             let (rel_file_path, mut read) = x?;
 
-            // Skip ignored files
-            if {
+            let ignore = {
                 let f = format!("/{source}/{}", rel_file_path);
                 let mut ignore = false;
                 for pattern in &ignore_patterns {
@@ -448,7 +447,10 @@ impl FilePicker {
                     }
                 }
                 ignore
-            } {
+            };
+
+            // Skip ignored files
+            if ignore {
                 debug!(
                     tectonic_log_source = "select",
                     "skipping file {rel_file_path:?} from source `{source}` because of ignore patterns"
@@ -561,7 +563,7 @@ impl FilePicker {
             {
                 let mut file = File::create(self.build_dir.join("search-report"))
                     .context("while writing search-report")?;
-                for entry in WalkDir::new(&self.build_dir.join("content")) {
+                for entry in WalkDir::new(self.build_dir.join("content")) {
                     let entry = entry?;
                     if !entry.file_type().is_dir() {
                         continue;

@@ -5,6 +5,7 @@ use anyhow::Result;
 use std::{io::Read, path::PathBuf};
 
 trait BundleInput {
+    #[allow(clippy::type_complexity)]
     fn iter_files(&mut self) -> impl Iterator<Item = Result<(String, Box<dyn Read + '_>)>>;
 }
 
@@ -22,6 +23,7 @@ impl<'a> Input {
         Ok(Self::Tarball(tar::TarBundleInput::new(path, root)?))
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn iter_files(
         &'a mut self,
     ) -> Box<dyn Iterator<Item = Result<(String, Box<dyn Read + 'a>)>> + 'a> {
