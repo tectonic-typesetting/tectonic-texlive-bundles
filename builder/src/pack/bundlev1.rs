@@ -1,15 +1,25 @@
-use super::util::{decode_hex, WriteSeek};
 use anyhow::{bail, Result};
 use flate2::{write::GzEncoder, Compression};
 use std::{
     fmt::Display,
     fs::{self, File},
     io::{stdout, BufRead, BufReader, Read, Seek, Write},
+    num::ParseIntError,
     path::PathBuf,
 };
 use tracing::info;
 
-// Size of ttbv1 header.
+pub trait WriteSeek: std::io::Write + Seek {}
+impl<T: Write + Seek> WriteSeek for T {}
+
+pub fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
+        .collect()
+}
+
+// Size of ttbv1 header
 const HEADER_SIZE: u64 = 66u64;
 
 #[derive(Debug)]
@@ -81,7 +91,7 @@ impl BundleV1 {
         let filelist_file = File::open(self.content_dir.join("FILELIST"))?;
         let reader = BufReader::new(filelist_file);
 
-        info!(tectonic_log_source = "bundle", "Building ttbv1 bundle...");
+        info!(tectonic_log_source = "pack", "Building ttbv1 bundle...");
 
         for line in reader.lines() {
             stdout().flush()?;
@@ -118,7 +128,7 @@ impl BundleV1 {
         }
 
         info!(
-            tectonic_log_source = "bundle",
+            tectonic_log_source = "pack",
             "Average compression ratio: {:.2}",
             real_len_sum as f64 / byte_count as f64
         );
@@ -137,7 +147,7 @@ impl BundleV1 {
         // Get current position
         self.index_start = self.target.stream_position()?;
 
-        info!(tectonic_log_source = "bundle", "Writing index");
+        info!(tectonic_log_source = "pack", "Writing index");
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         let mut real_len = 0usize;
@@ -163,7 +173,7 @@ impl BundleV1 {
         self.index_real_len = real_len as u32;
 
         info!(
-            tectonic_log_source = "bundle",
+            tectonic_log_source = "pack",
             "index is at {} and has length {}", self.index_start, self.index_gzip_len
         );
 
@@ -173,7 +183,7 @@ impl BundleV1 {
     fn write_header(&mut self) -> Result<u64> {
         self.target.seek(std::io::SeekFrom::Start(0))?;
 
-        info!(tectonic_log_source = "bundle", "Writing header");
+        info!(tectonic_log_source = "pack", "Writing header");
 
         // Parse bundle hash
         let mut hash_file = File::open(self.content_dir.join("SHA256SUM")).unwrap();

@@ -17,7 +17,7 @@ pub struct TarBundleInput {
 
 impl TarBundleInput {
     pub fn new(path: PathBuf, root: Option<PathBuf>) -> Result<Self> {
-        let path = path.canonicalize().unwrap();
+        let path = path.canonicalize()?;
         let mut file = File::open(&path)?;
 
         info!(

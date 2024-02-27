@@ -1,5 +1,4 @@
 use core::fmt;
-
 use nu_ansi_term::{Color, Style};
 use tracing::{
     field::{Field, Visit},
