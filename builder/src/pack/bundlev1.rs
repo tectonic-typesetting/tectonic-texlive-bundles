@@ -1,13 +1,25 @@
-use crate::util::{decode_hex, WriteSeek};
+use anyhow::{bail, Result};
 use flate2::{write::GzEncoder, Compression};
 use std::{
-    error::Error,
+    fmt::Display,
     fs::{self, File},
     io::{stdout, BufRead, BufReader, Read, Seek, Write},
+    num::ParseIntError,
     path::PathBuf,
 };
+use tracing::info;
 
-// Size of ttbv1 header.
+pub trait WriteSeek: std::io::Write + Seek {}
+impl<T: Write + Seek> WriteSeek for T {}
+
+pub fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
+        .collect()
+}
+
+// Size of ttbv1 header
 const HEADER_SIZE: u64 = 66u64;
 
 #[derive(Debug)]
@@ -24,8 +36,8 @@ struct FileListEntry {
     gzip_len: u32,
 }
 
-impl ToString for FileListEntry {
-    fn to_string(&self) -> String {
+impl Display for FileListEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         format!(
             "{} {} {} {} {}",
             self.start,
@@ -34,6 +46,7 @@ impl ToString for FileListEntry {
             self.path.to_str().unwrap(),
             self.hash
         )
+        .fmt(f)
     }
 }
 
@@ -48,47 +61,39 @@ pub struct BundleV1 {
 }
 
 impl BundleV1 {
-    pub fn make(target: Box<dyn WriteSeek>, content_dir: PathBuf) -> Result<(), Box<dyn Error>> {
-        let mut bundle = BundleV1::new(target, content_dir)?;
+    pub fn make(target: Box<dyn WriteSeek>, build_dir: PathBuf) -> Result<()> {
+        let mut bundle = BundleV1::new(target, build_dir)?;
 
         bundle.add_files()?;
         bundle.write_index()?;
         bundle.write_header()?;
 
-        println!(
-            "\nIndex is at {}, {}",
-            bundle.index_start, bundle.index_gzip_len
-        );
-
-        return Ok(());
+        Ok(())
     }
 
-    fn new(target: Box<dyn WriteSeek>, content_dir: PathBuf) -> Result<BundleV1, Box<dyn Error>> {
-        return Ok(BundleV1 {
+    fn new(target: Box<dyn WriteSeek>, build_dir: PathBuf) -> Result<BundleV1> {
+        Ok(BundleV1 {
             filelist: Vec::new(),
             target,
-            content_dir: content_dir.to_owned(),
+            content_dir: build_dir.join("content"),
             index_start: 0,
             index_gzip_len: 0,
             index_real_len: 0,
-        });
+        })
     }
 
-    fn add_files(&mut self) -> Result<u64, Box<dyn Error>> {
+    fn add_files(&mut self) -> Result<u64> {
         let mut byte_count = HEADER_SIZE; // Start after header
         let mut real_len_sum = 0; // Compute average compression ratio
 
-        self.target
-            .seek(std::io::SeekFrom::Start(byte_count.into()))?;
+        self.target.seek(std::io::SeekFrom::Start(byte_count))?;
 
-        let filelist_file = File::open(self.content_dir.join("FILELIST")).unwrap();
+        let filelist_file = File::open(self.content_dir.join("FILELIST"))?;
         let reader = BufReader::new(filelist_file);
 
-        let mut count = 0usize;
+        info!(tectonic_log_source = "pack", "Building ttbv1 bundle...");
 
         for line in reader.lines() {
-            count += 1;
-            print!("\rBuilding V1 Bundle... {}", count);
             stdout().flush()?;
 
             let line = line?;
@@ -98,7 +103,7 @@ impl BundleV1 {
                 let path = path.to_owned();
                 let hash = hash.to_owned();
 
-                let mut file = fs::File::open(&self.content_dir.join(&path[1..])).unwrap();
+                let mut file = fs::File::open(&self.content_dir.join(&path[1..]))?;
 
                 // Compress and write bytes
                 let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -118,19 +123,20 @@ impl BundleV1 {
                 byte_count += gzip_len as u64;
                 real_len_sum += real_len;
             } else {
-                panic!("malformed filelist line");
+                bail!("malformed filelist line");
             }
         }
 
-        println!("\rBuilding V1 Bundle... {}  Done.", count);
-        println!(
+        info!(
+            tectonic_log_source = "pack",
             "Average compression ratio: {:.2}",
             real_len_sum as f64 / byte_count as f64
         );
-        return Ok(byte_count);
+
+        Ok(byte_count)
     }
 
-    fn write_index(&mut self) -> Result<(), Box<dyn Error>> {
+    fn write_index(&mut self) -> Result<()> {
         // Generate a ttbv1 index and write it to the bundle.
         //
         // This index is a replacement for FILELIST and SEARCH, containing everything in those files
@@ -139,7 +145,9 @@ impl BundleV1 {
         // The original FILELIST and SEARCH files are still included in the bundle.
 
         // Get current position
-        self.index_start = self.target.seek(std::io::SeekFrom::Current(0))?;
+        self.index_start = self.target.stream_position()?;
+
+        info!(tectonic_log_source = "pack", "Writing index");
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         let mut real_len = 0usize;
@@ -155,7 +163,7 @@ impl BundleV1 {
 
         real_len += encoder.write("[FILELIST]\n".as_bytes())?;
         for i in &self.filelist {
-            let s = format!("{}\n", i.to_string());
+            let s = format!("{i}\n");
             real_len += encoder.write(s.as_bytes())?;
         }
         let gzip_len = self.target.write(&encoder.finish()?)?;
@@ -164,11 +172,18 @@ impl BundleV1 {
         self.index_gzip_len = gzip_len as u32;
         self.index_real_len = real_len as u32;
 
-        return Ok(());
+        info!(
+            tectonic_log_source = "pack",
+            "index is at {} and has length {}", self.index_start, self.index_gzip_len
+        );
+
+        Ok(())
     }
 
-    fn write_header(&mut self) -> Result<u64, Box<dyn Error>> {
+    fn write_header(&mut self) -> Result<u64> {
         self.target.seek(std::io::SeekFrom::Start(0))?;
+
+        info!(tectonic_log_source = "pack", "Writing header");
 
         // Parse bundle hash
         let mut hash_file = File::open(self.content_dir.join("SHA256SUM")).unwrap();
@@ -200,6 +215,6 @@ impl BundleV1 {
         // Make sure we wrote the expected number of bytes
         assert!(byte_count == HEADER_SIZE);
 
-        return Ok(byte_count);
+        Ok(byte_count)
     }
 }

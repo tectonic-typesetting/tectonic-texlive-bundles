@@ -1,5 +1,4 @@
-__pycache__/
-/scripts/*/target/
+/builder/target/
 
 /build
 /tests/build

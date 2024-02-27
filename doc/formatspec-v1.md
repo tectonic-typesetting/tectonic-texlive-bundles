@@ -1,27 +1,23 @@
-# Tectonic Bundle Builder
+# Tectonic Bundle Format V1 Specification
 
-This script transforms a `content` directory (produced by [`select`](../select)) into a tectonic bundle.
-Each format (currently only `ttb v1`) is impelemented as a separate file in this crate.
+A single TTBv1 bundle may be used on the network or from a local filesystem. This bundle format contains two parts:
+ - A 66-byte header, documented below
+ - File data, a concatenated blob of gzipped files. One of these blobs is the bundle index.
 
 Note that the extension for a tectonic bundle is `ttb`, regardless of its version. Also note that a bundle's hash only depends on it's content. If we generate many formats from one content directory, they will all have the same hash.
 
-## Format: TTBv1
-
-A single TTBv1 bundle may be used on the network or from a local filesystem. This bundle format contains two parts:
-
- - A 66-byte header, documented below
- - File data, a concatenated blob of gzipped files. One of these blobs is the bundle index.
 
 ### Header format
 A TTBv1 header consists of the following fields, in order.
 All numbers are stored with little-endian byte ordering.
 
- - `14 bytes`: signature. Always `tectonicbundle`, in any ttb version.
+ - `14 bytes`: magic bytes. Always `tectonicbundle`, in any ttb version.
  - ` 4 bytes`: bundle version, a `u32`. In this case, always 1.
  - ` 8 bytes`: index location, a `u64`. This is the first byte of the bundle index file.
  - ` 4 bytes`: gzipped index length, a `u32`. This is the length the bundle index file.
  - ` 4 bytes`: true index length, a `u32`. This is the decompressed length the bundle index file.
  - `32 bytes`: this bundle's hash.
+
 
 ### Index
 Bundle contents are stored as a concatenated `gzip` blobs after the header. These are found using a special file called the Index, the location of which location is stored in the header. The index is generated from the "meta-files" that the file selector produces, namely `FILELIST` and `SEARCH`. These are included in the bundle for consistency, but shouldn't ever be used.

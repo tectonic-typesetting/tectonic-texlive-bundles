@@ -1,8 +1,0 @@
-[package]
-name = "builder"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-flate2 = { version = "^1.0.19", default-features = false, features = ["zlib"] }
-walkdir = "2"
