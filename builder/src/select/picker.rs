@@ -80,12 +80,12 @@ struct FileListEntry {
 impl Display for FileListEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         format!(
-            "/{} {}",
-            self.path.to_str().unwrap(),
+            "{} {}",
             match &self.hash {
                 Some(s) => &s,
                 None => "nohash",
-            }
+            },
+            self.path.to_str().unwrap(),
         )
         .fmt(f)
     }
