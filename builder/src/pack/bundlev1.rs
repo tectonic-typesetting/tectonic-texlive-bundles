@@ -43,8 +43,8 @@ impl Display for FileListEntry {
             self.start,
             self.gzip_len,
             self.real_len,
-            self.path.to_str().unwrap(),
-            self.hash
+            self.hash,
+            self.path.to_str().unwrap()
         )
         .fmt(f)
     }
@@ -99,11 +99,10 @@ impl BundleV1 {
             let line = line?;
             let mut bits = line.split_whitespace();
 
-            if let (Some(path), Some(hash)) = (bits.next(), bits.next()) {
-                let path = path.to_owned();
-                let hash = hash.to_owned();
+            if let Some(hash) = bits.next() {
+                let path = bits.collect::<Vec<&str>>().join(" ");
 
-                let mut file = fs::File::open(&self.content_dir.join(&path[1..]))?;
+                let mut file = fs::File::open(&self.content_dir.join(&path))?;
 
                 // Compress and write bytes
                 let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -118,7 +117,7 @@ impl BundleV1 {
                     gzip_len: gzip_len as u32,
                     real_len: real_len as u32,
                     path: PathBuf::from(path),
-                    hash,
+                    hash: hash.to_owned(),
                 });
                 byte_count += gzip_len as u64;
                 real_len_sum += real_len;

@@ -1,6 +1,6 @@
 [bundle]
 name = "texlive2023"
-expected_hash = "c1bbb5f8498d2bb5471cc2b0790700ecb86fc992ec290f7eb718d8751f8ada2a"
+expected_hash = "e2571849ee65f1c8cb6dc7e433a1ae6b97b47eb24d27074cd485ff2bb87a79ab"
 
 search_order = ["/", { input = "include" }, { input = "texlive" }]
 
